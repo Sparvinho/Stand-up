@@ -1,10 +1,9 @@
 "use client";
-
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { 
-  Sparkles, Save, Check, Plus, Tag as TagIcon, Loader2, 
-  BotMessageSquare, X, CornerDownRight, Star, ShieldAlert, 
+import {
+  Sparkles, Save, Check, Plus, Tag as TagIcon, Loader2,
+  BotMessageSquare, X, CornerDownRight, Star, ShieldAlert,
   Layers, Smile, AlignLeft, Clock, History, Activity, RotateCcw, Trash2
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
@@ -14,32 +13,31 @@ function WorkshopContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const urlId = searchParams.get("id");
-  
+
   const [activeId, setActiveId] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [premise, setPremise] = useState("");
   const [status, setStatus] = useState("Råidé");
   const [priority, setPriority] = useState<number>(1);
-  const [mood, setMood] = useState("Trött");
+  const [mood, setMood] = useState("Avmätt");
   const [role, setRole] = useState("Story");
   const [riskLevel, setRiskLevel] = useState("Klubb");
   const [format, setFormat] = useState("observation");
-  const [durationSeconds, setDurationSeconds] = useState<number>(90);
-  
+  const [durationSeconds, setDurationSeconds] = useState<number>(20);
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
   const [comedyTags, setComedyTags] = useState<string[]>([]);
-  
-  const [history, setHistory] = useState<{date: string, text: string}[]>([]);
+  const [history, setHistory] = useState<{ date: string, text: string }[]>([]);
   const [lastSavedPremise, setLastSavedPremise] = useState("");
   const [showHistory, setShowHistory] = useState(false);
 
-  // Nytt state för statistik - initierat med nollor så rutan alltid syns
-  const [gigStats, setGigStats] = useState<any>({ current: { guld: 0, bra: 0, bomb: 0 }, historical: { guld: 0, bra: 0, bomb: 0 } });
-  
+  const [gigStats, setGigStats] = useState<any>({
+    current: { guld: 0, bra: 0, bomb: 0 },
+    historical: { guld: 0, bra: 0, bomb: 0 }
+  });
+
   const [isSaving, setIsSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [aiFeedback, setAiFeedback] = useState<string | null>(null);
 
@@ -54,22 +52,20 @@ function WorkshopContent() {
 
   const fetchBit = async (id: string) => {
     const { data, error } = await supabase.from("bits").select("*").eq("id", id).single();
-      
     if (data) {
       setTitle(data.title || "");
       setPremise(data.premise || "");
-      setLastSavedPremise(data.premise || ""); 
+      setLastSavedPremise(data.premise || "");
       setStatus(data.status || "Råidé");
       setPriority(Number(data.priority) || 1);
-      setMood(data.mood || "Trött");
+      setMood(data.mood || "Avmätt");
       setRole(data.role || "Story");
       setRiskLevel(data.risk_level || "Klubb");
       setFormat(data.format || "observation");
-      setDurationSeconds(data.duration_seconds !== null ? Number(data.duration_seconds) : 90);
+      setDurationSeconds(data.duration_seconds !== null ? Number(data.duration_seconds) : 20);
       setTags(Array.isArray(data.tags) ? data.tags : []);
       setComedyTags(Array.isArray(data.comedy_tags) ? data.comedy_tags : []);
       setHistory(Array.isArray(data.history) ? data.history : []);
-      // Om skämtet saknar statistik, lägg in nollor så rutan syns
       setGigStats(data.gig_stats || { current: { guld: 0, bra: 0, bomb: 0 }, historical: { guld: 0, bra: 0, bomb: 0 } });
       setAiFeedback(null);
     } else if (error) {
@@ -80,6 +76,7 @@ function WorkshopContent() {
   const handleSave = async () => {
     setIsSaving(true);
     let updatedHistory = [...history];
+
     if (activeId && premise !== lastSavedPremise && lastSavedPremise.trim() !== "") {
       updatedHistory = [{ date: new Date().toISOString(), text: lastSavedPremise }, ...updatedHistory];
     }
@@ -125,14 +122,11 @@ function WorkshopContent() {
 
   const handleResetStats = async () => {
     if (!window.confirm("Vill du nollställa den aktuella statistiken? (Total historik sparas i parentes)")) return;
-    
     const resetStats = {
       ...gigStats,
       current: { guld: 0, bra: 0, bomb: 0 }
     };
-    
     setGigStats(resetStats);
-    
     if (activeId) {
       await supabase.from("bits").update({ gig_stats: resetStats }).eq("id", activeId);
     }
@@ -158,12 +152,32 @@ function WorkshopContent() {
   };
 
   const startNew = () => {
-    setActiveId(null); setTitle(""); setPremise(""); setLastSavedPremise("");
-    setStatus("Råidé"); setPriority(1); setMood("Trött"); setRole("Story");
-    setRiskLevel("Klubb"); setFormat("observation"); setDurationSeconds(90);
-    setTags([]); setComedyTags([]); setHistory([]); 
+    setActiveId(null);
+    setTitle("");
+    setPremise("");
+    setLastSavedPremise("");
+    setStatus("Råidé");
+    setPriority(1);
+    setMood("Avmätt");
+    setRole("Story");
+    setRiskLevel("Klubb");
+    setFormat("observation");
+    setDurationSeconds(20);
+    setTags([]);
+    setComedyTags([]);
+    setHistory([]);
     setGigStats({ current: { guld: 0, bra: 0, bomb: 0 }, historical: { guld: 0, bra: 0, bomb: 0 } });
-    setTagInput(""); setAiFeedback(null);
+    setTagInput("");
+    setAiFeedback(null);
+    window.history.replaceState(null, "", "/workshop");
+  };
+
+  const handleDuplicate = () => {
+    setActiveId(null);
+    setTitle(title ? title + " - kopia" : "Ny kopia");
+    setSaved(false);
+    setHistory([]);
+    setGigStats({ current: { guld: 0, bra: 0, bomb: 0 }, historical: { guld: 0, bra: 0, bomb: 0 } });
     window.history.replaceState(null, "", "/workshop");
   };
 
@@ -176,12 +190,21 @@ function WorkshopContent() {
     }
   };
 
-  const removeTag = (tagToRemove: string) => { setTags(tags.filter(t => t !== tagToRemove)); };
-  const addComedyTag = () => { setComedyTags([...comedyTags, ""]); };
-  const updateComedyTag = (index: number, value: string) => {
-    const newTags = [...comedyTags]; newTags[index] = value; setComedyTags(newTags);
+  const removeTag = (tagToRemove: string) => { 
+    setTags(tags.filter(t => t !== tagToRemove)); 
   };
-  const removeComedyTag = (index: number) => { setComedyTags(comedyTags.filter((_, i) => i !== index)); };
+  
+  const addComedyTag = () => { setComedyTags([...comedyTags, ""]); };
+  
+  const updateComedyTag = (index: number, value: string) => {
+    const newTags = [...comedyTags]; 
+    newTags[index] = value; 
+    setComedyTags(newTags);
+  };
+  
+  const removeComedyTag = (index: number) => { 
+    setComedyTags(comedyTags.filter((_, i) => i !== index)); 
+  };
 
   const handleAnalyze = async () => {
     if (!premise || premise.length < 10) { alert("Skriv lite mer premiss först!"); return; }
@@ -211,29 +234,45 @@ function WorkshopContent() {
     <div className="h-full flex flex-col md:flex-row bg-neutral-950 text-white">
       <div className="flex-1 p-6 md:p-10 flex flex-col border-r border-neutral-800 relative h-full overflow-y-auto">
         <div className="flex justify-between items-center mb-4 shrink-0">
-          <input 
-            type="text" placeholder="Arbetstitel..." 
+          <input
+            type="text" placeholder="Arbetstitel..."
             className="bg-transparent text-3xl font-bold outline-none text-white placeholder-neutral-700 w-full"
             value={title} onChange={(e) => setTitle(e.target.value)}
           />
           <div className="flex items-center gap-2 shrink-0">
             {activeId && (
-              <button 
-                onClick={handleDelete} 
-                title="Släng skämt"
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-neutral-500 hover:text-red-400 hover:bg-red-500/10 border border-neutral-800 hover:border-red-500/30 transition-all"
-              >
-                <Trash2 size={14} /> <span className="hidden sm:inline">Släng</span>
-              </button>
+              <>
+                <button
+                  onClick={() => router.push(`/setlists?addBit=${activeId}`)}
+                  title="Lägg till i Setlist"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-neutral-400 hover:text-white hover:bg-neutral-900 border border-neutral-800 transition-all"
+                >
+                  <Layers size={14} /> <span className="hidden sm:inline">Till Setlist</span>
+                </button>
+                <button
+                  onClick={() => router.push(`/rutinbyggaren?addBit=${activeId}`)}
+                  title="Lägg till i Rutinbyggaren"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-neutral-400 hover:text-white hover:bg-neutral-900 border border-neutral-800 transition-all"
+                >
+                  <AlignLeft size={14} /> <span className="hidden sm:inline">Till Rutinbyggaren</span>
+                </button>
+                <button
+                  onClick={handleDelete}
+                  title="Släng skämt"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-neutral-500 hover:text-red-400 hover:bg-red-500/10 border border-neutral-800 hover:border-red-500/30 transition-all"
+                >
+                  <Trash2 size={14} /> <span className="hidden sm:inline">Släng</span>
+                </button>
+              </>
             )}
-            <button onClick={startNew} className="hidden md:flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-medium text-neutral-400 hover:text-white hover:bg-neutral-900 border border-neutral-800 transition-all">
-              <Plus size={14} /> Ny
+            
+            <button onClick={handleDuplicate} className="hidden md:flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-medium text-neutral-400 hover:text-white hover:bg-neutral-900 border border-neutral-800 transition-all">
+              <Plus size={14} /> Ny kopia
             </button>
-            <button 
+            
+            <button
               onClick={handleSave} disabled={isSaving || !title}
-              className={`flex items-center gap-2 px-5 py-2 rounded-lg text-xs font-bold transition-all ${
-                saved ? "bg-green-600 text-white" : "bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-950/40"
-              } ${(isSaving || !title) ? "opacity-50 cursor-not-allowed" : ""}`}
+              className={`flex items-center gap-2 px-5 py-2 rounded-lg text-xs font-bold transition-all ${saved ? "bg-green-600 text-white" : "bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-950/40"} ${(isSaving || !title) ? "opacity-50 cursor-not-allowed" : ""}`}
             >
               {saved ? <Check size={14} /> : <Save size={14} />}
               {saved ? "Sparad!" : isSaving ? "Sparar..." : "Spara"}
@@ -246,7 +285,11 @@ function WorkshopContent() {
           <div className="flex flex-col gap-1">
             <label className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider flex items-center gap-1"><TagIcon size={10} /> Status</label>
             <select value={status} onChange={(e) => setStatus(e.target.value)} className="bg-neutral-950 border border-neutral-800 text-xs font-semibold text-neutral-300 rounded px-2 py-1 outline-none cursor-pointer">
-              <option value="Råidé">Råidé</option><option value="Omarbeta">Omarbeta</option><option value="Testad">Testad</option><option value="Klubbklar">Klubbklar</option><option value="Burned">Burned</option>
+              <option value="Råidé">Råidé</option>
+              <option value="Omarbeta">Omarbeta</option>
+              <option value="Testad">Testad</option>
+              <option value="Klubbklar">Klubbklar</option>
+              <option value="Burned">Burned</option>
             </select>
           </div>
           <div className="flex flex-col gap-1">
@@ -269,30 +312,47 @@ function WorkshopContent() {
           <div className="flex flex-col gap-1">
             <label className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider flex items-center gap-1"><Smile size={10} /> Mood</label>
             <select value={mood} onChange={(e) => setMood(e.target.value)} className="bg-neutral-950 border border-neutral-800 text-xs font-semibold text-neutral-300 rounded px-2 py-1 outline-none cursor-pointer">
-              <option value="Trött">Trött</option><option value="Deppig">Deppig</option><option value="Arrogant">Arrogant</option><option value="Spelat oskuldsfull">Oskyldig</option><option value="Sarkastisk">Sarkastisk</option><option value="Upprörd">Upprörd</option><option value="Retstickig">Retstickig</option>
+              <option value="Avmätt">Avmätt</option>
+              <option value="Entusiastisk">Entusiastisk</option>
+              <option value="Neutral">Neutral</option>
+              <option value="Deppig">Deppig</option>
+              <option value="Arrogant">Arrogant</option>
+              <option value="Spelat oskuldsfull">Oskyldig</option>
+              <option value="Sarkastisk">Sarkastisk</option>
+              <option value="Upprörd">Upprörd</option>
+              <option value="Retstickig">Retstickig</option>
             </select>
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider flex items-center gap-1"><Layers size={10} /> Roll</label>
             <select value={role} onChange={(e) => setRole(e.target.value)} className="bg-neutral-950 border border-neutral-800 text-xs font-semibold text-neutral-300 rounded px-2 py-1 outline-none cursor-pointer">
-              <option value="Öppnare">Öppnare</option><option value="Story">Story / Block</option><option value="Callback">Callback</option><option value="Stängare">Stängare</option>
+              <option value="Öppnare">Öppnare</option>
+              <option value="Story">Story/Block</option>
+              <option value="Callback">Callback</option>
+              <option value="Stängare">Stängare</option>
+              <option value="Roastskämt">Roastskämt</option>
+              <option value="Nyhetsskämt">Nyhetsskämt</option>
             </select>
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider flex items-center gap-1"><ShieldAlert size={10} /> Risknivå</label>
             <select value={riskLevel} onChange={(e) => setRiskLevel(e.target.value)} className="bg-neutral-950 border border-neutral-800 text-xs font-semibold text-neutral-300 rounded px-2 py-1 outline-none cursor-pointer">
-              <option value="Familj/Företag">Trygg/Företag</option><option value="Klubb">Klubb</option><option value="Mörkt">Late Night / Mörkt</option>
+              <option value="Familj/Företag">Trygg/Företag</option>
+              <option value="Klubb">Klubb</option>
+              <option value="Mörkt">Late Night / Mörkt</option>
             </select>
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider flex items-center gap-1"><AlignLeft size={10} /> Format</label>
             <select value={format} onChange={(e) => setFormat(e.target.value)} className="bg-neutral-950 border border-neutral-800 text-xs font-semibold text-neutral-300 rounded px-2 py-1 outline-none cursor-pointer">
-              <option value="oneliner">Oneliner</option><option value="observation">Observation</option><option value="story">Lång Story</option>
+              <option value="oneliner">Oneliner</option>
+              <option value="observation">Observation</option>
+              <option value="story">Lång Story</option>
             </select>
           </div>
         </div>
 
-        {/* GIG-STATISTIK / POWER RANKING - Nu syns den ALLTID för aktiva skämt */}
+        {/* GIG-STATISTIK / POWER RANKING */}
         {activeId && gigStats && (
           <div className="mb-6 bg-neutral-900/40 border border-neutral-800/80 p-4 rounded-xl shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-6">
@@ -356,7 +416,9 @@ function WorkshopContent() {
                 <div className="mt-2 text-neutral-600"><CornerDownRight size={14} /></div>
                 <textarea
                   className="flex-1 bg-neutral-900 border border-neutral-800 rounded-lg p-2.5 text-xs text-neutral-200 placeholder-neutral-600 outline-none focus:border-blue-500/50 resize-none min-h-[50px]"
-                  placeholder={`Följdskämt #${index + 1}...`} value={tag} onChange={(e) => updateComedyTag(index, e.target.value)}
+                  placeholder={`Följdskämt #${index + 1}...`} 
+                  value={tag} 
+                  onChange={(e) => updateComedyTag(index, e.target.value)}
                 />
                 <button onClick={() => removeComedyTag(index)} className="mt-2 text-neutral-600 hover:text-red-400 opacity-0 group-hover:opacity-100 p-1.5"><X size={16} /></button>
               </div>
@@ -384,7 +446,7 @@ function WorkshopContent() {
                   <div key={i} className="bg-neutral-900/40 border border-neutral-800/80 rounded-lg p-4 group hover:border-neutral-700 transition-colors">
                     <div className="flex justify-between items-center mb-3 border-b border-neutral-800/50 pb-2">
                       <span className="text-[11px] font-mono text-neutral-500">Sparad: {new Date(h.date).toLocaleString("sv-SE", { dateStyle: "short", timeStyle: "short" })}</span>
-                      <button 
+                      <button
                         onClick={() => { if (window.confirm("Vill du ersätta din nuvarande text med denna gamla version?")) { setPremise(h.text); } }}
                         className="text-[10px] font-bold uppercase tracking-wider text-blue-400 hover:text-blue-300 bg-blue-900/20 hover:bg-blue-900/40 px-2.5 py-1 rounded transition-colors opacity-0 group-hover:opacity-100"
                       >

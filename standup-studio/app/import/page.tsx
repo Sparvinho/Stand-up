@@ -1,18 +1,19 @@
 "use client";
-
 import { useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, UploadCloud, FileText, Database, Loader2, CheckCircle, FileSpreadsheet, AlertTriangle } from "lucide-react";
+import { 
+  ArrowLeft, UploadCloud, FileText, Database, Loader2, CheckCircle,
+  FileSpreadsheet, AlertTriangle 
+} from "lucide-react";
 
 export default function ImportPage() {
   const router = useRouter();
   const [importMode, setImportMode] = useState<'text' | 'csv'>('text');
-  
   const [rawText, setRawText] = useState("");
   const [isImporting, setIsImporting] = useState(false);
   const [importResult, setImportResult] = useState<{ success: number, failed: number } | null>(null);
-
+  
   // Kalkylblad (CSV) states
   const [csvFile, setCsvFile] = useState<File | null>(null);
 
@@ -21,29 +22,39 @@ export default function ImportPage() {
     if (!rawText.trim()) return;
     setIsImporting(true);
     setImportResult(null);
-
+    
     // Delar upp texten vid varje dubbel radbrytning (tom rad)
     const blocks = rawText.split(/\n\s*\n/).filter(text => text.trim().length > 0);
-    
     let successCount = 0;
     let failedCount = 0;
-
+    
     for (const block of blocks) {
-      // Om blocket är kort, gissar vi att det är en oneliner. Annars en rutin.
-      const format = block.length < 150 ? "oneliner" : "rutin";
+      const lines = block.trim().split('\n');
+      let title = "Importerad idé";
+      let premise = block.trim();
+
+      // Om stycket har flera rader och den första raden är kort, 
+      // antar vi att det är en titel.
+      if (lines.length > 1 && lines[0].length < 60) {
+        title = lines[0].trim();
+        premise = lines.slice(1).join('\n').trim();
+      }
+
+      // Om premissen är kort, gissar vi att det är en oneliner. Annars en rutin.
+      const format = premise.length < 150 ? "oneliner" : "rutin";
       
       const { error } = await supabase.from("bits").insert([{
-        title: "Importerad idé",
-        premise: block.trim(),
+        title: title,
+        premise: premise,
         status: "Råidé",
         format: format,
         priority: 1
       }]);
-
+      
       if (error) failedCount++;
       else successCount++;
     }
-
+    
     setImportResult({ success: successCount, failed: failedCount });
     setIsImporting(false);
     setRawText("");
@@ -54,30 +65,37 @@ export default function ImportPage() {
     if (!csvFile) return;
     setIsImporting(true);
     setImportResult(null);
-
+    
     const reader = new FileReader();
     reader.onload = async (e) => {
       const text = e.target?.result as string;
       if (!text) return;
-
-      // Känner av om det är kommatecken eller semikolon (vanligt i svenska Excel)
+      
+      // Känner av om det är kommatecken eller semikolon
       const separator = text.includes(';') ? ';' : ',';
       const rows = text.split('\n').filter(row => row.trim().length > 0);
-      
       let successCount = 0;
       let failedCount = 0;
-
+      
       // Loopa igenom varje rad (vi hoppar över första raden om det är en rubrikrad)
       for (let i = 1; i < rows.length; i++) {
-        // En enkel split (kan behöva avancerad regex om man har kommatecken inuti sina skämt)
         const cols = rows[i].split(separator);
-        
-        // Vi antar kolumn 1 = Titel (frivillig), Kolumn 2 = Premiss
-        const title = cols[0]?.trim() || "Importerad idé";
-        const premise = cols[1]?.trim() || cols[0]?.trim(); // Fallback om bara en kolumn finns
+        let title = "Importerad idé";
+        let premise = "";
+
+        // Om filen har minst 2 kolumner och den andra inte är tom
+        if (cols.length > 1 && cols[1]?.trim().length > 0) {
+          title = cols[0]?.trim() || "Importerad idé";
+          // Ifall själva skämtet innehåller kommatecken slår vi ihop det igen
+          premise = cols.slice(1).join(separator).trim(); 
+        } else {
+          // Om det bara finns 1 kolumn, sätt det som premiss och behåll standardtitel
+          title = "Importerad idé";
+          premise = cols[0]?.trim();
+        }
         
         if (!premise) continue;
-
+        
         const { error } = await supabase.from("bits").insert([{
           title: title,
           premise: premise,
@@ -85,11 +103,11 @@ export default function ImportPage() {
           format: premise.length < 150 ? "oneliner" : "rutin",
           priority: 1
         }]);
-
+        
         if (error) failedCount++;
         else successCount++;
       }
-
+      
       setImportResult({ success: successCount, failed: failedCount });
       setIsImporting(false);
       setCsvFile(null);
@@ -107,25 +125,24 @@ export default function ImportPage() {
           <Database className="text-blue-500" size={28} /> Massimport
         </h1>
       </div>
-
+      
       <div className="max-w-4xl mx-auto">
         <div className="bg-neutral-900/50 border border-neutral-800 rounded-3xl p-6 md:p-10">
-          
           <div className="flex gap-4 mb-8 bg-neutral-950 p-2 rounded-xl border border-neutral-800 w-fit">
-            <button 
-              onClick={() => {setImportMode('text'); setImportResult(null);}} 
+            <button
+              onClick={() => {setImportMode('text'); setImportResult(null);}}
               className={`px-6 py-3 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${importMode === 'text' ? 'bg-blue-600 text-white' : 'text-neutral-500 hover:text-neutral-300'}`}
             >
               <FileText size={18} /> Från Google Docs (Text)
             </button>
-            <button 
-              onClick={() => {setImportMode('csv'); setImportResult(null);}} 
+            <button
+              onClick={() => {setImportMode('csv'); setImportResult(null);}}
               className={`px-6 py-3 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${importMode === 'csv' ? 'bg-green-600 text-white' : 'text-neutral-500 hover:text-neutral-300'}`}
             >
               <FileSpreadsheet size={18} /> Från Google Sheets (.csv)
             </button>
           </div>
-
+          
           {importResult && (
             <div className="mb-8 bg-green-950/30 border border-green-900/50 rounded-xl p-6 flex flex-col items-center justify-center text-center animate-in fade-in zoom-in-95">
               <CheckCircle size={48} className="text-green-500 mb-4" />
@@ -135,20 +152,18 @@ export default function ImportPage() {
               <button onClick={() => router.push('/vault')} className="mt-6 bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 text-white font-bold py-2.5 px-6 rounded-lg transition-all">Gå till Biblioteket</button>
             </div>
           )}
-
+          
           {!importResult && importMode === 'text' && (
             <div className="animate-in fade-in slide-in-from-bottom-2">
               <h2 className="text-xl font-bold text-white mb-2">Klipp ut och klistra in</h2>
               <p className="text-neutral-400 text-sm mb-6">Har du en lång lista i Anteckningar eller Google Docs? Klistra in den här. Appen skapar automatiskt ett nytt skämt av varje stycke (avdelat med en tom rad).</p>
-              
-              <textarea 
+              <textarea
                 value={rawText}
                 onChange={(e) => setRawText(e.target.value)}
                 placeholder="Skämt 1 premiss...\n\nSkämt 2 premiss...\n\nSkämt 3 premiss..."
                 className="w-full h-80 bg-neutral-950 border border-neutral-800 rounded-xl p-5 text-neutral-200 outline-none focus:border-blue-500 resize-none leading-relaxed mb-6 font-mono text-sm"
               />
-              
-              <button 
+              <button
                 onClick={handleTextImport}
                 disabled={isImporting || !rawText.trim()}
                 className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl disabled:opacity-50 transition-all shadow-lg flex items-center justify-center gap-2"
@@ -158,7 +173,7 @@ export default function ImportPage() {
               </button>
             </div>
           )}
-
+          
           {!importResult && importMode === 'csv' && (
             <div className="animate-in fade-in slide-in-from-bottom-2">
               <h2 className="text-xl font-bold text-white mb-2">Ladda upp kalkylblad</h2>
@@ -168,10 +183,10 @@ export default function ImportPage() {
                 <AlertTriangle size={20} className="text-orange-500 shrink-0" />
                 <p>Se till att <strong>Kolumn A</strong> är skämtets Titel, och <strong>Kolumn B</strong> är skämtets Premiss (text). Rad 1 ignoreras (rubrikrad).</p>
               </div>
-
+              
               <div className="border-2 border-dashed border-neutral-700 hover:border-green-500 bg-neutral-950 rounded-xl p-10 flex flex-col items-center justify-center text-center transition-colors mb-6 relative">
-                <input 
-                  type="file" 
+                <input
+                  type="file"
                   accept=".csv"
                   onChange={(e) => setCsvFile(e.target.files?.[0] || null)}
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
@@ -180,8 +195,8 @@ export default function ImportPage() {
                 <h3 className="text-lg font-bold text-white mb-1">{csvFile ? csvFile.name : "Klicka för att välja din .csv fil"}</h3>
                 <p className="text-neutral-500 text-sm">Dra och släpp fungerar också.</p>
               </div>
-
-              <button 
+              
+              <button
                 onClick={handleCsvImport}
                 disabled={isImporting || !csvFile}
                 className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-4 rounded-xl disabled:opacity-50 transition-all shadow-lg flex items-center justify-center gap-2"
@@ -191,7 +206,6 @@ export default function ImportPage() {
               </button>
             </div>
           )}
-
         </div>
       </div>
     </div>
