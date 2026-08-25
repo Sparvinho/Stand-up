@@ -199,6 +199,13 @@ function RutinbyggarenContent() {
     setSearchQuery("");
   };
 
+  const handleProfileChange = (profile: string) => {
+    setGigProfile(profile);
+    if (profile !== 'test' && selectedStatus === 'Testa') {
+      setSelectedStatus('Alla');
+    }
+  };
+
   const activeFilterCount = 
     (gigProfile !== "ingen" ? 1 : 0) +
     (minPriority > 0 ? 1 : 0) +
@@ -275,14 +282,23 @@ function RutinbyggarenContent() {
       .filter(bit => bit.status !== "Pensionerad" && bit.status !== "Burned");
 
     switch (gigProfile) {
-      case 'foretag': list = list.filter(b => (b.priority ?? 0) >= 2 && b.status !== 'Råidé' && b.status !== 'Omarbeta'); break;
-      case 'test': list = list.filter(b => b.status === 'Råidé' || b.status === 'Omarbeta'); break;
+      case 'foretag': list = list.filter(b => (b.priority ?? 0) >= 2 && b.status !== 'Råidé' && b.status !== 'Omarbeta' && b.status !== 'Testa'); break;
+      case 'test': list = list.filter(b => b.status === 'Råidé' || b.status === 'Omarbeta' || b.status === 'Testa'); break;
       case 'special': list = list.filter(b => b.priority === 3); break;
       case 'klubb': case 'ingen': default: break;
     }
 
     if (minPriority > 0) list = list.filter(bit => (bit.priority || 1) >= minPriority);
-    if (selectedStatus !== "Alla") list = list.filter(bit => bit.status?.toLowerCase() === selectedStatus.toLowerCase());
+    
+    if (selectedStatus !== "Alla") {
+      list = list.filter(bit => {
+        const s = bit.status?.toLowerCase();
+        const target = selectedStatus.toLowerCase();
+        if (target === "redo") return s === "redo" || s === "testad";
+        return s === target;
+      });
+    }
+
     if (selectedRole !== "Alla") list = list.filter(bit => bit.role?.toLowerCase() === selectedRole.toLowerCase());
     if (selectedRisk !== "Alla") list = list.filter(bit => bit.risk_level?.toLowerCase() === selectedRisk.toLowerCase());
     if (selectedFormat !== "Alla") list = list.filter(bit => bit.format?.toLowerCase() === selectedFormat.toLowerCase());
@@ -418,8 +434,9 @@ function RutinbyggarenContent() {
                     <select value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value)} className="bg-neutral-900 border border-neutral-800 rounded px-2 py-1.5 text-neutral-300 outline-none">
                       <option value="Alla">Alla statusar</option>
                       <option value="Klubbklar">Klubbklar</option>
-                      <option value="Testad">Testad</option>
+                      <option value="Redo">Redo</option>
                       <option value="Råidé">Råidé</option>
+                      {gigProfile === 'test' && <option value="Testa">Testa</option>}
                       <option value="Omarbeta">Omarbeta</option>
                     </select>
                     <select value={selectedMood} onChange={(e) => setSelectedMood(e.target.value)} className="bg-neutral-900 border border-neutral-800 rounded px-2 py-1.5 text-neutral-300 outline-none">
@@ -458,11 +475,11 @@ function RutinbyggarenContent() {
                   <div className="pt-2 border-t border-neutral-800/60">
                     <label className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider block mb-1.5">Gig-Profil</label>
                     <div className="flex flex-wrap gap-1.5">
-                      <button onClick={() => setGigProfile('ingen')} className={`px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1 transition-all ${gigProfile === 'ingen' ? 'bg-neutral-700 text-white' : 'bg-neutral-900 text-neutral-400 border border-neutral-800'}`}><X size={10}/> Ingen</button>
-                      <button onClick={() => setGigProfile('klubb')} className={`px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1 transition-all ${gigProfile === 'klubb' ? 'bg-amber-600 text-stone-950' : 'bg-neutral-900 text-neutral-400 border border-neutral-800'}`}><Mic size={10}/> Klubb</button>
-                      <button onClick={() => setGigProfile('foretag')} className={`px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1 transition-all ${gigProfile === 'foretag' ? 'bg-amber-600 text-stone-950' : 'bg-neutral-900 text-neutral-400 border border-neutral-800'}`}><Briefcase size={10}/> Företag</button>
-                      <button onClick={() => setGigProfile('test')} className={`px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1 transition-all ${gigProfile === 'test' ? 'bg-amber-600 text-stone-950' : 'bg-neutral-900 text-neutral-400 border border-neutral-800'}`}><Edit3 size={10}/> Test</button>
-                      <button onClick={() => setGigProfile('special')} className={`px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1 transition-all ${gigProfile === 'special' ? 'bg-amber-600 text-stone-950' : 'bg-neutral-900 text-neutral-400 border border-neutral-800'}`}><Film size={10}/> Special</button>
+                      <button onClick={() => handleProfileChange('ingen')} className={`px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1 transition-all ${gigProfile === 'ingen' ? 'bg-neutral-700 text-white' : 'bg-neutral-900 text-neutral-400 border border-neutral-800'}`}><X size={10}/> Ingen</button>
+                      <button onClick={() => handleProfileChange('klubb')} className={`px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1 transition-all ${gigProfile === 'klubb' ? 'bg-amber-600 text-stone-950' : 'bg-neutral-900 text-neutral-400 border border-neutral-800'}`}><Mic size={10}/> Klubb</button>
+                      <button onClick={() => handleProfileChange('foretag')} className={`px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1 transition-all ${gigProfile === 'foretag' ? 'bg-amber-600 text-stone-950' : 'bg-neutral-900 text-neutral-400 border border-neutral-800'}`}><Briefcase size={10}/> Företag</button>
+                      <button onClick={() => handleProfileChange('test')} className={`px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1 transition-all ${gigProfile === 'test' ? 'bg-amber-600 text-stone-950' : 'bg-neutral-900 text-neutral-400 border border-neutral-800'}`}><Edit3 size={10}/> Test</button>
+                      <button onClick={() => handleProfileChange('special')} className={`px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1 transition-all ${gigProfile === 'special' ? 'bg-amber-600 text-stone-950' : 'bg-neutral-900 text-neutral-400 border border-neutral-800'}`}><Film size={10}/> Special</button>
                     </div>
                   </div>
 
@@ -478,7 +495,6 @@ function RutinbyggarenContent() {
                 </div>
               )}
             </div>
-
             <div className="flex-1 overflow-y-auto p-2 md:p-4 space-y-2">
               {filteredAvailableBits.map(bit => {
                 const isHidden = hiddenBits.includes(String(bit.id));
