@@ -3,31 +3,63 @@
 import { useState, useEffect, useMemo } from "react";
 import { 
   FolderOpen, Search, Mic, Briefcase, Edit3, Film, X, 
-  ArrowUpDown, Filter, Hash, Plus, ArrowRight, Loader2, Activity, Trash2 
+  ArrowUpDown, Filter, Hash, Plus, ArrowRight, Loader2, Activity, Trash2, Eraser
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { useRouter } from "next/navigation";
 
 export default function Library() {
   const router = useRouter();
+  
   const [allBits, setAllBits] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isFiltersLoaded, setIsFiltersLoaded] = useState(false);
   
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("Alla");
   const [gigProfile, setGigProfile] = useState<string>("ingen");
   const [minPriority, setMinPriority] = useState<number>(0);
   const [sortBy, setSortBy] = useState<string>("priority-desc");
-  
   const [selectedRole, setSelectedRole] = useState("Alla");
   const [selectedRisk, setSelectedRisk] = useState("Alla");
   const [selectedFormat, setSelectedFormat] = useState("Alla");
+  const [selectedMood, setSelectedMood] = useState("Alla");
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
+  // 1. Ladda filter från LocalStorage vid start
   useEffect(() => {
+    const saved = localStorage.getItem("vaultFilters");
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed.selectedStatus) setSelectedStatus(parsed.selectedStatus);
+        if (parsed.gigProfile) setGigProfile(parsed.gigProfile);
+        if (parsed.minPriority) setMinPriority(parsed.minPriority);
+        if (parsed.sortBy) setSortBy(parsed.sortBy);
+        if (parsed.selectedRole) setSelectedRole(parsed.selectedRole);
+        if (parsed.selectedRisk) setSelectedRisk(parsed.selectedRisk);
+        if (parsed.selectedFormat) setSelectedFormat(parsed.selectedFormat);
+        if (parsed.selectedMood) setSelectedMood(parsed.selectedMood);
+        if (parsed.selectedTag) setSelectedTag(parsed.selectedTag);
+        if (parsed.showAdvancedFilters !== undefined) setShowAdvancedFilters(parsed.showAdvancedFilters);
+      } catch (e) {
+        console.error("Kunde inte läsa sparade filter", e);
+      }
+    }
+    setIsFiltersLoaded(true);
     fetchBits();
   }, []);
+
+  // 2. Spara filter till LocalStorage när de ändras
+  useEffect(() => {
+    if (!isFiltersLoaded) return;
+    const filtersToSave = {
+      selectedStatus, gigProfile, minPriority, sortBy, selectedRole, 
+      selectedRisk, selectedFormat, selectedMood, selectedTag, showAdvancedFilters
+    };
+    localStorage.setItem("vaultFilters", JSON.stringify(filtersToSave));
+  }, [selectedStatus, gigProfile, minPriority, sortBy, selectedRole, selectedRisk, selectedFormat, selectedMood, selectedTag, showAdvancedFilters, isFiltersLoaded]);
 
   const fetchBits = async () => {
     setIsLoading(true);
@@ -51,21 +83,40 @@ export default function Library() {
     setIsLoading(false);
   };
 
-  // NYTT: Funktion för att slänga skämt direkt från valvet
   const handleDeleteBit = async (e: React.MouseEvent, id: string) => {
-    e.stopPropagation(); // Viktigt! Hindrar kortet från att öppnas i Workshopen när vi klickar på papperskorgen
-    
+    e.stopPropagation();
     if (window.confirm("Är du säker på att du vill slänga det här skämtet? Det går inte att ångra.")) {
       const { error } = await supabase.from("bits").delete().eq("id", id);
-      
       if (!error) {
-        // Filtrera bort det raderade skämtet direkt så vi slipper ladda om hela sidan
         setAllBits(prev => prev.filter(bit => bit.id !== id));
       } else {
         alert("Kunde inte radera skämtet: " + error.message);
       }
     }
   };
+
+  const clearFilters = () => {
+    setSelectedStatus("Alla");
+    setGigProfile("ingen");
+    setMinPriority(0);
+    setSortBy("priority-desc");
+    setSelectedRole("Alla");
+    setSelectedRisk("Alla");
+    setSelectedFormat("Alla");
+    setSelectedMood("Alla");
+    setSelectedTag(null);
+    setSearchQuery("");
+  };
+
+  const activeFilterCount = 
+    (gigProfile !== "ingen" ? 1 : 0) +
+    (minPriority > 0 ? 1 : 0) +
+    (selectedStatus !== "Alla" ? 1 : 0) +
+    (selectedRole !== "Alla" ? 1 : 0) +
+    (selectedRisk !== "Alla" ? 1 : 0) +
+    (selectedFormat !== "Alla" ? 1 : 0) +
+    (selectedMood !== "Alla" ? 1 : 0) +
+    (selectedTag ? 1 : 0);
 
   const getMoodStyle = (mood: string) => {
     switch(mood) {
@@ -114,6 +165,7 @@ export default function Library() {
     if (selectedRole !== "Alla") list = list.filter(bit => bit.role?.toLowerCase() === selectedRole.toLowerCase());
     if (selectedRisk !== "Alla") list = list.filter(bit => bit.risk_level?.toLowerCase() === selectedRisk.toLowerCase());
     if (selectedFormat !== "Alla") list = list.filter(bit => bit.format?.toLowerCase() === selectedFormat.toLowerCase());
+    if (selectedMood !== "Alla") list = list.filter(bit => bit.mood?.toLowerCase() === selectedMood.toLowerCase());
     if (selectedTag) list = list.filter(bit => bit.tags?.some((t: string) => t.toLowerCase() === selectedTag.toLowerCase()));
     
     if (searchQuery.trim()) {
@@ -126,7 +178,7 @@ export default function Library() {
         return matchTitle || matchPremise || matchTags || matchComedyTags;
       });
     }
-    
+
     list = [...list].sort((a, b) => {
       if (sortBy === "priority-desc") return (b.priority || 1) - (a.priority || 1);
       if (sortBy === "priority-asc") return (a.priority || 1) - (b.priority || 1);
@@ -134,9 +186,9 @@ export default function Library() {
       if (sortBy === "newest") return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
       return 0;
     });
-    
+
     return list;
-  }, [allBits, searchQuery, selectedStatus, gigProfile, minPriority, sortBy, selectedRole, selectedRisk, selectedFormat, selectedTag]);
+  }, [allBits, searchQuery, selectedStatus, gigProfile, minPriority, sortBy, selectedRole, selectedRisk, selectedFormat, selectedMood, selectedTag]);
 
   return (
     <div className="h-full flex flex-col bg-neutral-950 p-6 md:p-10 overflow-hidden text-white">
@@ -155,80 +207,146 @@ export default function Library() {
       </div>
 
       {/* Filtersektion */}
-      <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-4 space-y-4 mb-6 shrink-0">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest block mb-1.5">Gig-Profil</label>
-            <div className="flex flex-wrap gap-1.5">
-              <button onClick={() => setGigProfile('ingen')} className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${gigProfile === 'ingen' ? 'bg-neutral-700 text-white' : 'bg-neutral-950 text-neutral-400 hover:text-white border border-neutral-800'}`}><X size={12}/> Ingen profil</button>
-              <button onClick={() => setGigProfile('klubb')} className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${gigProfile === 'klubb' ? 'bg-blue-600 text-white' : 'bg-neutral-950 text-neutral-400 hover:text-white border border-neutral-800'}`}><Mic size={12}/> Klubb</button>
-              <button onClick={() => setGigProfile('foretag')} className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${gigProfile === 'foretag' ? 'bg-indigo-600 text-white' : 'bg-neutral-950 text-neutral-400 hover:text-white border border-neutral-800'}`}><Briefcase size={12}/> Företag</button>
-              <button onClick={() => setGigProfile('test')} className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${gigProfile === 'test' ? 'bg-orange-600 text-white' : 'bg-neutral-950 text-neutral-400 hover:text-white border border-neutral-800'}`}><Edit3 size={12}/> Test-mick</button>
-              <button onClick={() => setGigProfile('special')} className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${gigProfile === 'special' ? 'bg-purple-600 text-white' : 'bg-neutral-950 text-neutral-400 hover:text-white border border-neutral-800'}`}><Film size={12}/> Special</button>
-            </div>
-          </div>
-          
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="flex items-center gap-1">
-              <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest mr-1">Betyg:</span>
-              {[{ label: "Alla", val: 0 }, { label: "★ 1+", val: 1 }, { label: "★★ 2+", val: 2 }, { label: "★★★ 3", val: 3 }].map((p) => (
-                <button key={p.val} onClick={() => setMinPriority(p.val)} className={`px-2.5 py-1 rounded text-xs font-bold transition-all ${minPriority === p.val ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/50" : "bg-neutral-950 text-neutral-500 hover:text-neutral-300 border border-neutral-800"}`}>{p.label}</button>
-              ))}
-            </div>
-            <div className="flex items-center gap-1">
-              <ArrowUpDown size={14} className="text-neutral-500" />
-              <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="bg-neutral-950 border border-neutral-800 text-xs text-neutral-300 rounded-lg px-2.5 py-1.5 outline-none cursor-pointer hover:border-neutral-700">
-                <option value="priority-desc">Bäst först (★★★ → ★)</option>
-                <option value="priority-asc">Lägst prioritet (★ → ★★★)</option>
-                <option value="newest">Senast skapade</option>
-                <option value="title">Titel (A-Ö)</option>
-              </select>
-            </div>
-            <button onClick={() => setShowAdvancedFilters(!showAdvancedFilters)} className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors ${showAdvancedFilters ? 'bg-blue-600/20 border-blue-500/50 text-blue-400' : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-white'}`}>
-              <Filter size={14} /> Fler Filter
-            </button>
-          </div>
-        </div>
-
-        {showAdvancedFilters && (
-          <div className="bg-neutral-950/70 border border-neutral-800 rounded-lg p-3 space-y-3 text-xs animate-in fade-in">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div>
-                <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block mb-1">Roll</label>
-                <select value={selectedRole} onChange={(e) => setSelectedRole(e.target.value)} className="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-2.5 py-1.5 text-neutral-300 outline-none"><option value="Alla">Alla roller</option><option value="Öppnare">Öppnare</option><option value="Story">Mellanbit / Story</option><option value="Callback">Callback</option><option value="Stängare">Stängare</option></select>
-              </div>
-              <div>
-                <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block mb-1">Risknivå</label>
-                <select value={selectedRisk} onChange={(e) => setSelectedRisk(e.target.value)} className="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-2.5 py-1.5 text-neutral-300 outline-none"><option value="Alla">Alla nivåer</option><option value="Familj/Företag">Trygg/Företag</option><option value="Klubb">Klubb standard</option><option value="Mörkt">Late Night / Mörkt</option></select>
-              </div>
-              <div>
-                <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block mb-1">Format</label>
-                <select value={selectedFormat} onChange={(e) => setSelectedFormat(e.target.value)} className="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-2.5 py-1.5 text-neutral-300 outline-none"><option value="Alla">Alla format</option><option value="oneliner">Oneliner</option><option value="observation">Kort observation</option><option value="story">Lång bit / Story</option></select>
-              </div>
-            </div>
-            {topTags.length > 0 && (
-              <div className="pt-2 border-t border-neutral-800/60">
-                <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block mb-1.5 flex items-center gap-1"><Hash size={12} /> Populära tags</label>
-                <div className="flex flex-wrap gap-1.5">
-                  {topTags.map(t => (
-                    <button key={t} onClick={() => setSelectedTag(selectedTag === t ? null : t)} className={`px-2.5 py-1 rounded text-xs font-medium transition-all ${selectedTag === t ? 'bg-blue-600 text-white font-bold' : 'bg-neutral-900 text-neutral-400 hover:text-white border border-neutral-800'}`}>#{t}</button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        <div className="flex gap-2">
+      <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-4 mb-6 shrink-0">
+        <div className="flex gap-3 items-center w-full">
           <div className="relative flex-1">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
-            <input type="text" placeholder="Sök bland skämt (titel, text, tags)..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-neutral-950 border border-neutral-800 rounded-lg pl-9 pr-8 py-2 text-sm text-white placeholder-neutral-500 outline-none focus:border-blue-500/50" />
-            {searchQuery && (<button onClick={() => setSearchQuery("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-white"><X size={14}/></button>)}
+            <input 
+              type="text" 
+              placeholder="Sök bland skämt (titel, text, tags)..." 
+              value={searchQuery} 
+              onChange={(e) => setSearchQuery(e.target.value)} 
+              className="w-full bg-neutral-950 border border-neutral-800 rounded-lg pl-9 pr-8 py-2.5 text-sm text-white placeholder-neutral-500 outline-none focus:border-blue-500/50" 
+            />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-white">
+                <X size={14}/>
+              </button>
+            )}
           </div>
-          <select value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value)} className="bg-neutral-950 border border-neutral-800 text-sm text-neutral-300 rounded-lg px-3 py-2 outline-none cursor-pointer hover:border-neutral-700">
-            <option value="Alla">Alla statusar</option><option value="Klubbklar">Klubbklar</option><option value="Testad">Testad</option><option value="Råidé">Råidé</option><option value="Omarbeta">Omarbeta</option>
-          </select>
+          <button 
+            onClick={() => setShowAdvancedFilters(!showAdvancedFilters)} 
+            className={`flex items-center gap-2 text-sm font-medium px-4 py-2.5 rounded-lg border transition-colors shrink-0 ${
+              showAdvancedFilters || activeFilterCount > 0 ? 'bg-blue-600/20 border-blue-500/50 text-blue-400' : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-white'
+            }`}
+          >
+            <Filter size={16} /> 
+            <span className="hidden sm:inline">Filter</span>
+            {activeFilterCount > 0 && <span className="bg-blue-600 text-white text-[10px] px-1.5 py-0.5 rounded-full">{activeFilterCount}</span>}
+          </button>
         </div>
+
+        {/* Infällbar Meny */}
+        {showAdvancedFilters && (
+          <div className="mt-4 pt-4 border-t border-neutral-800 animate-in fade-in">
+            <div className="flex justify-between items-center mb-4">
+              <span className="text-xs font-bold text-neutral-400 uppercase tracking-widest">Klassificeringar</span>
+              {activeFilterCount > 0 && (
+                <button onClick={clearFilters} className="text-xs font-medium text-red-400 hover:text-red-300 flex items-center gap-1.5 transition-colors">
+                  <Eraser size={14}/> Töm alla filter
+                </button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3 mb-4">
+              <div className="flex flex-col gap-1">
+                <label className="text-[9px] font-bold text-neutral-500 uppercase">Sortering</label>
+                <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="bg-neutral-950 border border-neutral-800 text-xs text-neutral-300 rounded px-2 py-2 outline-none cursor-pointer">
+                  <option value="priority-desc">Bäst först (★★★)</option>
+                  <option value="priority-asc">Lägst prioritet (★)</option>
+                  <option value="newest">Senast skapade</option>
+                  <option value="title">Titel (A-Ö)</option>
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[9px] font-bold text-neutral-500 uppercase">Betyg</label>
+                <select value={minPriority} onChange={(e) => setMinPriority(Number(e.target.value))} className="bg-neutral-950 border border-neutral-800 text-xs text-neutral-300 rounded px-2 py-2 outline-none cursor-pointer">
+                  <option value={0}>Alla betyg</option>
+                  <option value={1}>★ 1+</option>
+                  <option value={2}>★★ 2+</option>
+                  <option value={3}>★★★ 3</option>
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[9px] font-bold text-neutral-500 uppercase">Status</label>
+                <select value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value)} className="bg-neutral-950 border border-neutral-800 text-xs text-neutral-300 rounded px-2 py-2 outline-none cursor-pointer">
+                  <option value="Alla">Alla statusar</option>
+                  <option value="Klubbklar">Klubbklar</option>
+                  <option value="Testad">Testad</option>
+                  <option value="Råidé">Råidé</option>
+                  <option value="Omarbeta">Omarbeta</option>
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[9px] font-bold text-neutral-500 uppercase">Känsla / Mood</label>
+                <select value={selectedMood} onChange={(e) => setSelectedMood(e.target.value)} className="bg-neutral-950 border border-neutral-800 text-xs text-neutral-300 rounded px-2 py-2 outline-none cursor-pointer">
+                  <option value="Alla">Alla känslor</option>
+                  <option value="Avmätt">Avmätt</option>
+                  <option value="Entusiastisk">Entusiastisk</option>
+                  <option value="Neutral">Neutral</option>
+                  <option value="Deppig">Deppig</option>
+                  <option value="Arrogant">Arrogant</option>
+                  <option value="Spelat oskuldsfull">Oskyldig</option>
+                  <option value="Sarkastisk">Sarkastisk</option>
+                  <option value="Upprörd">Upprörd</option>
+                  <option value="Retstickig">Retstickig</option>
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[9px] font-bold text-neutral-500 uppercase">Roll i set</label>
+                <select value={selectedRole} onChange={(e) => setSelectedRole(e.target.value)} className="bg-neutral-950 border border-neutral-800 text-xs text-neutral-300 rounded px-2 py-2 outline-none cursor-pointer">
+                  <option value="Alla">Alla roller</option>
+                  <option value="Öppnare">Öppnare</option>
+                  <option value="Story">Mellanbit / Story</option>
+                  <option value="Callback">Callback</option>
+                  <option value="Stängare">Stängare</option>
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[9px] font-bold text-neutral-500 uppercase">Risknivå</label>
+                <select value={selectedRisk} onChange={(e) => setSelectedRisk(e.target.value)} className="bg-neutral-950 border border-neutral-800 text-xs text-neutral-300 rounded px-2 py-2 outline-none cursor-pointer">
+                  <option value="Alla">Alla nivåer</option>
+                  <option value="Familj/Företag">Trygg/Företag</option>
+                  <option value="Klubb">Klubb standard</option>
+                  <option value="Mörkt">Late Night / Mörkt</option>
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[9px] font-bold text-neutral-500 uppercase">Format</label>
+                <select value={selectedFormat} onChange={(e) => setSelectedFormat(e.target.value)} className="bg-neutral-950 border border-neutral-800 text-xs text-neutral-300 rounded px-2 py-2 outline-none cursor-pointer">
+                  <option value="Alla">Alla format</option>
+                  <option value="oneliner">Oneliner</option>
+                  <option value="observation">Observation</option>
+                  <option value="story">Lång Story</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex flex-col md:flex-row gap-6 pt-3 border-t border-neutral-800">
+              <div>
+                <label className="text-[9px] font-bold text-neutral-500 uppercase tracking-widest block mb-2">Gig-Profil</label>
+                <div className="flex flex-wrap gap-1.5">
+                  <button onClick={() => setGigProfile('ingen')} className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${gigProfile === 'ingen' ? 'bg-neutral-700 text-white' : 'bg-neutral-950 text-neutral-400 hover:text-white border border-neutral-800'}`}><X size={12}/> Ingen</button>
+                  <button onClick={() => setGigProfile('klubb')} className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${gigProfile === 'klubb' ? 'bg-blue-600 text-white' : 'bg-neutral-950 text-neutral-400 hover:text-white border border-neutral-800'}`}><Mic size={12}/> Klubb</button>
+                  <button onClick={() => setGigProfile('foretag')} className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${gigProfile === 'foretag' ? 'bg-indigo-600 text-white' : 'bg-neutral-950 text-neutral-400 hover:text-white border border-neutral-800'}`}><Briefcase size={12}/> Företag</button>
+                  <button onClick={() => setGigProfile('test')} className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${gigProfile === 'test' ? 'bg-orange-600 text-white' : 'bg-neutral-950 text-neutral-400 hover:text-white border border-neutral-800'}`}><Edit3 size={12}/> Test-mick</button>
+                  <button onClick={() => setGigProfile('special')} className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${gigProfile === 'special' ? 'bg-purple-600 text-white' : 'bg-neutral-950 text-neutral-400 hover:text-white border border-neutral-800'}`}><Film size={12}/> Special</button>
+                </div>
+              </div>
+
+              {topTags.length > 0 && (
+                <div className="md:border-l md:border-neutral-800 md:pl-6">
+                  <label className="text-[9px] font-bold text-neutral-500 uppercase tracking-widest block mb-2 flex items-center gap-1"><Hash size={12}/> Populära tags</label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {topTags.map(t => (
+                      <button key={t} onClick={() => setSelectedTag(selectedTag === t ? null : t)} className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${selectedTag === t ? 'bg-blue-600 text-white font-bold' : 'bg-neutral-950 text-neutral-400 hover:text-white border border-neutral-800'}`}>#{t}</button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Skämtlistan / Grid */}
@@ -246,7 +364,7 @@ export default function Library() {
               const mood = getMoodStyle(bit.mood);
               const powerScore = calculatePowerScore(bit.gig_stats);
               const totalSwipes = bit.gig_stats?.current ? (bit.gig_stats.current.guld + bit.gig_stats.current.bra + bit.gig_stats.current.bomb) : 0;
-
+              
               return (
                 <div key={bit.id} onClick={() => router.push(`/workshop?id=${bit.id}`)} className={`p-4 bg-neutral-900 border ${mood.border} hover:border-blue-500/50 rounded-xl cursor-pointer transition-all flex flex-col justify-between group shadow-sm`}>
                   <div>
@@ -265,19 +383,13 @@ export default function Library() {
                     </div>
                     <p className="text-neutral-400 text-xs line-clamp-2 mb-3">{bit.premise || "Ingen text"}</p>
                   </div>
-                  
                   <div className="flex items-center justify-between pt-2 border-t border-neutral-800/80 mt-auto">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       {bit.mood && <span className={`text-[9px] font-bold px-2 py-0.5 rounded border uppercase tracking-wider ${mood.badge}`}>{bit.mood}</span>}
                       {bit.status && <span className="text-[10px] px-2 py-0.5 bg-neutral-950 text-neutral-400 border border-neutral-800 rounded">{bit.status}</span>}
                     </div>
                     <div className="flex items-center gap-3">
-                      {/* Papperskorgen - dyker bara upp när man hovrar över kortet */}
-                      <button 
-                        onClick={(e) => handleDeleteBit(e, bit.id)}
-                        className="text-neutral-600 hover:text-red-400 md:opacity-0 md:group-hover:opacity-100 transition-opacity p-1"
-                        title="Släng skämt"
-                      >
+                      <button onClick={(e) => handleDeleteBit(e, bit.id)} className="text-neutral-600 hover:text-red-400 md:opacity-0 md:group-hover:opacity-100 transition-opacity p-1" title="Släng skämt">
                         <Trash2 size={14} />
                       </button>
                       <ArrowRight size={14} className="text-neutral-600 group-hover:text-blue-400 group-hover:translate-x-0.5 transition-all" />

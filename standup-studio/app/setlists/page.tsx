@@ -33,10 +33,10 @@ function SetlistsContent() {
   const [gigProfile, setGigProfile] = useState<string>("ingen");
   const [minPriority, setMinPriority] = useState<number>(0);
   const [sortBy, setSortBy] = useState<string>("priority-desc");
-
   const [selectedRole, setSelectedRole] = useState("Alla");
   const [selectedRisk, setSelectedRisk] = useState("Alla");
   const [selectedFormat, setSelectedFormat] = useState("Alla");
+  const [selectedMood, setSelectedMood] = useState("Alla");
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
@@ -47,7 +47,6 @@ function SetlistsContent() {
   const [saved, setSaved] = useState(false);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
-  // Gig Mode & Utvärdering States
   const [isGigMode, setIsGigMode] = useState(false);
   const [gigPhase, setGigPhase] = useState<'live' | 'eval-overall' | 'eval-bits'>('live');
   const [liveSeconds, setLiveSeconds] = useState(0);
@@ -217,21 +216,23 @@ function SetlistsContent() {
     setIsSaving(true);
     const currentPerformedAt = new Date().toISOString();
     const cleanBitIds = setlist.map(String);
+    
     const evaluationData = { overall: overallGigScore, notes: gigNotes, bits: bitScores };
 
     if (activeId) {
-      await supabase.from("setlists").update({
-        performed_at: currentPerformedAt, evaluations: evaluationData
+      await supabase.from("setlists").update({ 
+        performed_at: currentPerformedAt, evaluations: evaluationData 
       }).eq("id", activeId);
     } else {
-      const { data } = await supabase.from("setlists").insert([{
+      const { data } = await supabase.from("setlists").insert([{ 
         title, venue, bit_ids: cleanBitIds, hidden_bit_ids: hiddenBits.map(String),
-        performed_at: currentPerformedAt, evaluations: evaluationData
+        performed_at: currentPerformedAt, evaluations: evaluationData 
       }]).select().single();
       if (data) setActiveId(data.id);
     }
 
     const bitIdsToUpdate = Object.keys(bitScores).filter(id => bitScores[id] > 0);
+
     if (bitIdsToUpdate.length > 0) {
       const { data: bitsToUpdate } = await supabase
         .from("bits")
@@ -240,8 +241,8 @@ function SetlistsContent() {
 
       for (const bit of bitsToUpdate || []) {
         const score = bitScores[bit.id];
-        
         const stats = bit.gig_stats || { current: { guld: 0, bra: 0, bomb: 0 }, historical: { guld: 0, bra: 0, bomb: 0 } };
+        
         if (!stats.current) stats.current = { guld: 0, bra: 0, bomb: 0 };
         if (!stats.historical) stats.historical = { guld: 0, bra: 0, bomb: 0 };
 
@@ -333,6 +334,29 @@ function SetlistsContent() {
   const clearHiddenBits = () => {
     setHiddenBits([]);
   };
+
+  const clearFilters = () => {
+    setSelectedStatus("Alla");
+    setGigProfile("ingen");
+    setMinPriority(0);
+    setSortBy("priority-desc");
+    setSelectedRole("Alla");
+    setSelectedRisk("Alla");
+    setSelectedFormat("Alla");
+    setSelectedMood("Alla");
+    setSelectedTag(null);
+    setSearchQuery("");
+  };
+
+  const activeFilterCount = 
+    (gigProfile !== "ingen" ? 1 : 0) +
+    (minPriority > 0 ? 1 : 0) +
+    (selectedStatus !== "Alla" ? 1 : 0) +
+    (selectedRole !== "Alla" ? 1 : 0) +
+    (selectedRisk !== "Alla" ? 1 : 0) +
+    (selectedFormat !== "Alla" ? 1 : 0) +
+    (selectedMood !== "Alla" ? 1 : 0) +
+    (selectedTag ? 1 : 0);
 
   const calculatePowerScore = (stats: any) => {
     if (!stats || !stats.current) return 0;
@@ -439,29 +463,13 @@ function SetlistsContent() {
         break;
     }
 
-    if (minPriority > 0) {
-      list = list.filter(bit => (bit.priority || 1) >= minPriority);
-    }
-
-    if (selectedStatus !== "Alla") {
-      list = list.filter(bit => bit.status?.toLowerCase() === selectedStatus.toLowerCase());
-    }
-
-    if (selectedRole !== "Alla") {
-      list = list.filter(bit => bit.role?.toLowerCase() === selectedRole.toLowerCase());
-    }
-
-    if (selectedRisk !== "Alla") {
-      list = list.filter(bit => bit.risk_level?.toLowerCase() === selectedRisk.toLowerCase());
-    }
-
-    if (selectedFormat !== "Alla") {
-      list = list.filter(bit => bit.format?.toLowerCase() === selectedFormat.toLowerCase());
-    }
-
-    if (selectedTag) {
-      list = list.filter(bit => bit.tags?.some((t: string) => t.toLowerCase() === selectedTag.toLowerCase()));
-    }
+    if (minPriority > 0) list = list.filter(bit => (bit.priority || 1) >= minPriority);
+    if (selectedStatus !== "Alla") list = list.filter(bit => bit.status?.toLowerCase() === selectedStatus.toLowerCase());
+    if (selectedRole !== "Alla") list = list.filter(bit => bit.role?.toLowerCase() === selectedRole.toLowerCase());
+    if (selectedRisk !== "Alla") list = list.filter(bit => bit.risk_level?.toLowerCase() === selectedRisk.toLowerCase());
+    if (selectedFormat !== "Alla") list = list.filter(bit => bit.format?.toLowerCase() === selectedFormat.toLowerCase());
+    if (selectedMood !== "Alla") list = list.filter(bit => bit.mood?.toLowerCase() === selectedMood.toLowerCase());
+    if (selectedTag) list = list.filter(bit => bit.tags?.some((t: string) => t.toLowerCase() === selectedTag.toLowerCase()));
 
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
@@ -486,10 +494,9 @@ function SetlistsContent() {
       if (sortBy === "newest") return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
       return 0;
     });
-  }, [allBits, setlist, searchQuery, selectedStatus, gigProfile, minPriority, sortBy, selectedRole, selectedRisk, selectedFormat, selectedTag, hiddenBits]);
+  }, [allBits, setlist, searchQuery, selectedStatus, gigProfile, minPriority, sortBy, selectedRole, selectedRisk, selectedFormat, selectedMood, selectedTag, hiddenBits]);
 
 
-  // UTSKRIFT / FUSKLAPP-VY
   if (isPrintMode) {
     return (
       <div className="fixed inset-0 z-[100] bg-white text-black p-4 md:p-16 overflow-y-auto">
@@ -513,8 +520,8 @@ function SetlistsContent() {
     );
   }
 
-  // GIG-LÄGE
   if (isGigMode) {
+    
     if (gigPhase === 'live') {
       const liveMin = Math.floor(liveSeconds / 60);
       const liveSec = liveSeconds % 60;
@@ -527,11 +534,13 @@ function SetlistsContent() {
             <div>
               <h1 className="text-xl md:text-3xl font-bold text-neutral-500 uppercase tracking-widest">{title || "Namnlös Setlist"}</h1>
             </div>
+
             <div className="flex items-center gap-4 md:gap-6 bg-neutral-950 border border-neutral-800 px-4 md:px-6 py-2 md:py-3 rounded-2xl shadow-xl w-full md:w-auto justify-between md:justify-center">
               <div className="flex flex-col items-center">
                 <span className={`text-4xl md:text-5xl font-mono font-black ${timerColor}`}>{String(liveMin).padStart(2, '0')}:{String(liveSec).padStart(2, '0')}</span>
               </div>
               <div className="flex items-center gap-2 border-l border-neutral-800 pl-4">
+                
                 <button 
                   onClick={handleRecordingToggle} 
                   className={`p-2 md:p-3 rounded-full transition-all ${isRecording ? 'bg-red-600/20 text-red-500 animate-pulse' : 'bg-neutral-900 text-neutral-400 hover:text-white'}`}
@@ -539,11 +548,13 @@ function SetlistsContent() {
                 >
                   <Mic size={24} />
                 </button>
+
                 <button onClick={() => setIsTimerRunning(!isTimerRunning)} className="p-2 md:p-3 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white transition-colors">
                   {isTimerRunning ? <Pause size={20} /> : <Play size={20} className="fill-white" />}
                 </button>
               </div>
             </div>
+
             <div className="flex gap-2 w-full md:w-auto mt-2 md:mt-0">
               {!performedAt && (
                 <button onClick={() => { setGigPhase('eval-overall'); setIsTimerRunning(false); setIsRecording(false); }} className="w-full md:w-auto justify-center px-4 md:px-6 py-3 bg-green-600 hover:bg-green-500 text-white font-bold rounded-lg transition-colors flex items-center gap-2">
@@ -552,6 +563,7 @@ function SetlistsContent() {
               )}
             </div>
           </div>
+
           <div className="max-w-4xl mx-auto w-full space-y-8 md:space-y-10 pb-24">
             {setlistBits.map((bit, index) => (
               <div key={bit.id} className="flex gap-4 md:gap-6 items-start border-l-4 border-neutral-800 pl-4 md:pl-8">
@@ -570,6 +582,7 @@ function SetlistsContent() {
           <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 md:p-8 max-w-xl w-full">
             <h2 className="text-2xl md:text-3xl font-bold mb-2">Bra jobbat på scen! 🎤</h2>
             <p className="text-sm md:text-base text-neutral-400 mb-6 md:mb-8">Dags att utvärdera giget medan det är färskt i minnet.</p>
+
             <div className="mb-6 md:mb-8">
               <label className="block text-xs md:text-sm font-bold text-neutral-300 mb-3">Hur kändes giget i sin helhet?</label>
               <div className="flex flex-wrap items-center gap-2 md:gap-3">
@@ -583,6 +596,7 @@ function SetlistsContent() {
                 ))}
               </div>
             </div>
+
             <div className="mb-6 md:mb-8">
               <label className="block text-xs md:text-sm font-bold text-neutral-300 mb-3 flex items-center gap-2">
                 <MessageSquare size={16} /> Snabba tankar (Publiken, rummet)
@@ -593,6 +607,7 @@ function SetlistsContent() {
                 placeholder="T.ex: Mikrofonen glappade, men de älskade dejting-blocket..."
               />
             </div>
+
             <div className="flex flex-col-reverse md:flex-row items-center justify-between gap-4">
               <button onClick={() => { setIsGigMode(false); setGigPhase('live'); }} className="w-full md:w-auto text-neutral-500 hover:text-white px-4 py-3 md:py-2">Avbryt</button>
               <button onClick={() => { setGigPhase('eval-bits'); setCurrentEvalIndex(0); }} disabled={overallGigScore === 0} className="w-full md:w-auto justify-center bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 px-6 rounded-lg flex items-center gap-2 disabled:opacity-50">
@@ -606,6 +621,7 @@ function SetlistsContent() {
 
     if (gigPhase === 'eval-bits') {
       const isFinished = currentEvalIndex >= setlistBits.length;
+      
       if (isFinished) {
         return (
           <div className="fixed inset-0 z-50 bg-black text-white flex items-center justify-center p-6">
@@ -621,11 +637,13 @@ function SetlistsContent() {
       }
 
       const currentBit = setlistBits[currentEvalIndex];
+
       return (
         <div className="fixed inset-0 z-50 bg-black text-white flex flex-col items-center justify-center p-4 md:p-6 touch-none">
           <div className="mb-6 md:mb-8 text-neutral-500 font-bold uppercase tracking-widest text-xs md:text-sm">
             Skämt {currentEvalIndex + 1} av {setlistBits.length}
           </div>
+
           <div 
             className="bg-neutral-900 border-2 border-neutral-800 rounded-3xl p-6 md:p-10 max-w-md w-full shadow-2xl relative select-none cursor-grab active:cursor-grabbing"
             onTouchStart={handleTouchStart}
@@ -633,6 +651,7 @@ function SetlistsContent() {
           >
             <h2 className="text-2xl md:text-3xl font-black text-center leading-tight mb-4">{currentBit.title}</h2>
             <p className="text-neutral-500 text-center text-xs md:text-sm mb-8 md:mb-10 line-clamp-4 md:line-clamp-3">{currentBit.premise}</p>
+
             <div className="grid grid-cols-3 gap-2 md:gap-4">
               <div />
               <button onClick={() => handleSwipe(currentBit.id, 'up')} className="flex flex-col items-center gap-1 md:gap-2 p-2 md:p-4 text-yellow-500 hover:bg-yellow-500/10 rounded-2xl transition-colors">
@@ -640,19 +659,23 @@ function SetlistsContent() {
                 <span className="font-bold text-[10px] md:text-xs uppercase text-center leading-tight">Guld<br className="hidden md:block"/>(★★★)</span>
               </button>
               <div />
+
               <button onClick={() => handleSwipe(currentBit.id, 'left')} className="flex flex-col items-center gap-1 md:gap-2 p-2 md:p-4 text-red-500 hover:bg-red-500/10 rounded-2xl transition-colors">
                 <ChevronLeft size={32} className="md:w-[40px] md:h-[40px]" />
                 <span className="font-bold text-[10px] md:text-xs uppercase text-center leading-tight">Bomb<br className="hidden md:block"/>(★)</span>
               </button>
+
               <button onClick={() => handleSwipe(currentBit.id, 'down')} className="flex flex-col items-center justify-center gap-1 md:gap-2 p-2 md:p-4 text-neutral-500 hover:bg-neutral-800 rounded-2xl transition-colors">
                 <SkipForward size={20} className="md:w-[24px] md:h-[24px]" />
                 <span className="font-bold text-[10px] md:text-xs uppercase mt-1 md:mt-2">Hoppa</span>
               </button>
+
               <button onClick={() => handleSwipe(currentBit.id, 'right')} className="flex flex-col items-center gap-1 md:gap-2 p-2 md:p-4 text-green-500 hover:bg-green-500/10 rounded-2xl transition-colors">
                 <ChevronRight size={32} className="md:w-[40px] md:h-[40px]" />
                 <span className="font-bold text-[10px] md:text-xs uppercase text-center leading-tight">Bra<br className="hidden md:block"/>(★★)</span>
               </button>
             </div>
+            
             <p className="text-center text-neutral-600 text-[9px] md:text-[10px] uppercase font-bold mt-8 md:mt-10 tracking-widest">
               Använd knapparna eller Swipa skärmen
             </p>
@@ -662,7 +685,6 @@ function SetlistsContent() {
     }
   }
 
-  // HUVUDVYN (SETLIST BYGGAREN)
   return (
     <div className="min-h-[100dvh] md:h-[100dvh] flex flex-col md:flex-row bg-[#08080c] text-white md:overflow-hidden">
       
@@ -673,13 +695,16 @@ function SetlistsContent() {
             <ListMusic className="text-purple-500" size={18} /> Setlists
           </h2>
         </div>
+        
         <button onClick={startNew} className="w-full mb-4 md:mb-6 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold py-2 md:py-2.5 px-4 rounded-lg flex items-center justify-center gap-2 transition-all shadow-lg shadow-purple-950/40 text-xs md:text-sm">
           <Plus size={16} /> Ny Setlist
         </button>
+
         <div className="flex-1 overflow-y-auto space-y-2 md:space-y-3 pr-1 md:pr-2 scrollbar-hide">
           {savedSetlists.map((setlistObj) => {
             const isPerformed = !!setlistObj.performed_at;
             const score = setlistObj.evaluations?.overall || 0;
+
             return (
               <div 
                 key={setlistObj.id} onClick={() => loadSetlist(setlistObj)}
@@ -713,6 +738,8 @@ function SetlistsContent() {
 
       {/* Höger Sida: Byggaren */}
       <div className="flex-1 p-4 md:p-10 flex flex-col md:h-full md:overflow-y-auto">
+        
+        {/* Setlist Header */}
         <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start mb-4 shrink-0 border-b border-purple-950/20 pb-4 gap-4">
           <div className="flex-1 w-full max-w-xl">
             <div className="flex items-center gap-2 mb-1">
@@ -747,6 +774,7 @@ function SetlistsContent() {
                 </p>
               </div>
             </div>
+            
             <div className="flex flex-wrap items-center gap-4 md:gap-6 w-full md:w-auto">
               <div className="flex items-center gap-2 md:gap-4 bg-neutral-950/80 border border-neutral-800 px-2.5 md:px-3.5 py-1.5 rounded-lg flex-1 md:flex-none justify-between md:justify-start">
                 <div className="flex items-center gap-1 md:gap-1.5 text-neutral-400"><Sliders size={13} className="text-purple-400" /><span className="text-[9px] md:text-[10px] font-bold uppercase tracking-wider hidden sm:inline">Tempo:</span></div>
@@ -774,16 +802,32 @@ function SetlistsContent() {
                   <h3 className="font-semibold text-neutral-300 text-xs md:text-sm flex items-center gap-2">
                     <FolderOpen size={14} className="text-purple-400" /> Bibliotek ({filteredAvailableBits.length})
                   </h3>
-                  <div className="flex items-center gap-2">
-                    <button onClick={() => setShowAdvancedFilters(!showAdvancedFilters)} className={`flex items-center gap-1 text-[10px] md:text-xs font-medium px-2 py-1 md:px-2.5 md:py-1 rounded-md border transition-colors ${showAdvancedFilters ? 'bg-purple-600/20 border-purple-500/50 text-purple-300' : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-white'}`}>
-                      <Filter size={10} className="md:w-3 md:h-3" /> Filter
-                    </button>
-                  </div>
                 </div>
-                
-                {/* ---> INFÄLLBARA FILTER FÖR BIBLIOTEKET I SETLISTS <--- */}
+
+                <div className="flex gap-2 w-full">
+                  <div className="relative flex-1">
+                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
+                    <input type="text" placeholder="Sök..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-neutral-950 border border-neutral-800 rounded-lg pl-9 pr-3 py-1.5 text-xs text-white outline-none focus:border-purple-500/50" />
+                    {searchQuery && <button onClick={() => setSearchQuery("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-white"><X size={12}/></button>}
+                  </div>
+                  <button 
+                    onClick={() => setShowAdvancedFilters(!showAdvancedFilters)} 
+                    className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors shrink-0 ${showAdvancedFilters || activeFilterCount > 0 ? 'bg-purple-600/20 border-purple-500/50 text-purple-300' : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-white'}`}
+                  >
+                    <Filter size={14} /> <span className="hidden sm:inline">Filter</span> {activeFilterCount > 0 && `(${activeFilterCount})`}
+                  </button>
+                </div>
+
+                {/* INFÄLLBARA FILTER */}
                 {showAdvancedFilters && (
-                  <div className="bg-neutral-950/70 border border-neutral-800 rounded-lg p-2.5 space-y-2.5 text-xs animate-in fade-in mt-2">
+                  <div className="bg-neutral-950/80 border border-neutral-800 rounded-lg p-3 space-y-3 text-xs animate-in fade-in">
+                    <div className="flex justify-between items-center border-b border-neutral-800/60 pb-2">
+                      <span className="font-bold text-neutral-400">Filtrera skämt</span>
+                      {activeFilterCount > 0 && (
+                        <button onClick={clearFilters} className="text-red-400 hover:text-red-300 flex items-center gap-1"><Eraser size={12}/> Töm</button>
+                      )}
+                    </div>
+                    
                     <div className="grid grid-cols-2 gap-2">
                       <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="bg-neutral-900 border border-neutral-800 rounded px-2 py-1.5 text-neutral-300 outline-none">
                         <option value="priority-desc">Bäst först (★★★)</option>
@@ -797,15 +841,24 @@ function SetlistsContent() {
                         <option value={2}>★★ 2+</option>
                         <option value={3}>★★★ 3</option>
                       </select>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-2">
                       <select value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value)} className="bg-neutral-900 border border-neutral-800 rounded px-2 py-1.5 text-neutral-300 outline-none">
                         <option value="Alla">Alla statusar</option>
                         <option value="Klubbklar">Klubbklar</option>
                         <option value="Testad">Testad</option>
                         <option value="Råidé">Råidé</option>
                         <option value="Omarbeta">Omarbeta</option>
+                      </select>
+                      <select value={selectedMood} onChange={(e) => setSelectedMood(e.target.value)} className="bg-neutral-900 border border-neutral-800 rounded px-2 py-1.5 text-neutral-300 outline-none">
+                        <option value="Alla">Alla känslor</option>
+                        <option value="Avmätt">Avmätt</option>
+                        <option value="Entusiastisk">Entusiastisk</option>
+                        <option value="Neutral">Neutral</option>
+                        <option value="Deppig">Deppig</option>
+                        <option value="Arrogant">Arrogant</option>
+                        <option value="Spelat oskuldsfull">Oskyldig</option>
+                        <option value="Sarkastisk">Sarkastisk</option>
+                        <option value="Upprörd">Upprörd</option>
+                        <option value="Retstickig">Retstickig</option>
                       </select>
                       <select value={selectedRole} onChange={(e) => setSelectedRole(e.target.value)} className="bg-neutral-900 border border-neutral-800 rounded px-2 py-1.5 text-neutral-300 outline-none">
                         <option value="Alla">Alla roller</option>
@@ -814,16 +867,13 @@ function SetlistsContent() {
                         <option value="Callback">Callback</option>
                         <option value="Stängare">Stängare</option>
                       </select>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2">
                       <select value={selectedRisk} onChange={(e) => setSelectedRisk(e.target.value)} className="bg-neutral-900 border border-neutral-800 rounded px-2 py-1.5 text-neutral-300 outline-none">
                         <option value="Alla">Alla risknivåer</option>
                         <option value="Familj/Företag">Trygg/Företag</option>
                         <option value="Klubb">Klubb standard</option>
                         <option value="Mörkt">Late Night / Mörkt</option>
                       </select>
-                      <select value={selectedFormat} onChange={(e) => setSelectedFormat(e.target.value)} className="bg-neutral-900 border border-neutral-800 rounded px-2 py-1.5 text-neutral-300 outline-none">
+                      <select value={selectedFormat} onChange={(e) => setSelectedFormat(e.target.value)} className="bg-neutral-900 border border-neutral-800 rounded px-2 py-1.5 text-neutral-300 outline-none col-span-2">
                         <option value="Alla">Alla format</option>
                         <option value="oneliner">Oneliner</option>
                         <option value="observation">Observation</option>
@@ -831,14 +881,14 @@ function SetlistsContent() {
                       </select>
                     </div>
 
-                    <div className="pt-1">
+                    <div className="pt-2 border-t border-neutral-800/60">
                       <label className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider block mb-1.5">Gig-Profil</label>
                       <div className="flex flex-wrap gap-1.5">
-                        <button onClick={() => setGigProfile('ingen')} className={`px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1 transition-all ${gigProfile === 'ingen' ? 'bg-neutral-700 text-white' : 'bg-neutral-950 text-neutral-400 border border-neutral-800'}`}><X size={10}/> Ingen profil</button>
-                        <button onClick={() => setGigProfile('klubb')} className={`px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1 transition-all ${gigProfile === 'klubb' ? 'bg-blue-600 text-white' : 'bg-neutral-950 text-neutral-400 border border-neutral-800'}`}><Mic size={10}/> Klubb</button>
-                        <button onClick={() => setGigProfile('foretag')} className={`px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1 transition-all ${gigProfile === 'foretag' ? 'bg-indigo-600 text-white' : 'bg-neutral-950 text-neutral-400 border border-neutral-800'}`}><Briefcase size={10}/> Företag</button>
-                        <button onClick={() => setGigProfile('test')} className={`px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1 transition-all ${gigProfile === 'test' ? 'bg-orange-600 text-white' : 'bg-neutral-950 text-neutral-400 border border-neutral-800'}`}><Edit3 size={10}/> Test</button>
-                        <button onClick={() => setGigProfile('special')} className={`px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1 transition-all ${gigProfile === 'special' ? 'bg-purple-600 text-white' : 'bg-neutral-950 text-neutral-400 border border-neutral-800'}`}><Film size={10}/> Special</button>
+                        <button onClick={() => setGigProfile('ingen')} className={`px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1 transition-all ${gigProfile === 'ingen' ? 'bg-neutral-700 text-white' : 'bg-neutral-900 text-neutral-400 border border-neutral-800'}`}><X size={10}/> Ingen</button>
+                        <button onClick={() => setGigProfile('klubb')} className={`px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1 transition-all ${gigProfile === 'klubb' ? 'bg-blue-600 text-white' : 'bg-neutral-900 text-neutral-400 border border-neutral-800'}`}><Mic size={10}/> Klubb</button>
+                        <button onClick={() => setGigProfile('foretag')} className={`px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1 transition-all ${gigProfile === 'foretag' ? 'bg-indigo-600 text-white' : 'bg-neutral-900 text-neutral-400 border border-neutral-800'}`}><Briefcase size={10}/> Företag</button>
+                        <button onClick={() => setGigProfile('test')} className={`px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1 transition-all ${gigProfile === 'test' ? 'bg-orange-600 text-white' : 'bg-neutral-900 text-neutral-400 border border-neutral-800'}`}><Edit3 size={10}/> Test</button>
+                        <button onClick={() => setGigProfile('special')} className={`px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1 transition-all ${gigProfile === 'special' ? 'bg-purple-600 text-white' : 'bg-neutral-900 text-neutral-400 border border-neutral-800'}`}><Film size={10}/> Special</button>
                       </div>
                     </div>
 
@@ -853,13 +903,6 @@ function SetlistsContent() {
                     )}
                   </div>
                 )}
-
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
-                    <input type="text" placeholder="Sök..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-neutral-950 border border-neutral-800 rounded-lg pl-9 pr-3 py-1.5 text-xs text-white outline-none" />
-                  </div>
-                </div>
               </div>
               <div className="flex-1 overflow-y-auto p-2 md:p-4 space-y-2">
                 {filteredAvailableBits.map(bit => {
@@ -878,7 +921,7 @@ function SetlistsContent() {
                           )}
                         </h4>
                       </div>
-                      <button className="text-neutral-600 group-hover:text-purple-400 bg-neutral-900 p-1.5 rounded shrink-0"><Plus size={14} /></button>
+                      <button className="text-neutral-600 group-hover:text-purple-400 bg-neutral-900 p-1.5 rounded shrink-0"><Plus size={14}/></button>
                     </div>
                   );
                 })}
@@ -891,27 +934,30 @@ function SetlistsContent() {
             <div className="p-3 md:p-4 border-b border-purple-950/30 bg-neutral-900/80 flex justify-between items-center">
               <h3 className="font-semibold text-purple-300 text-xs md:text-sm flex items-center gap-2"><ListMusic size={14} className="text-purple-400 md:w-4 md:h-4" /> Ordning</h3>
             </div>
+            
             <div className="flex-1 overflow-y-auto p-2 md:p-4 space-y-2 md:space-y-3">
               {setlistBits.map((bit, index) => {
                 const collisionInfo = getCollisionWarning(bit.id);
                 const powerScore = calculatePowerScore(bit.gig_stats);
                 const hasSwipes = bit.gig_stats && bit.gig_stats.current && (bit.gig_stats.current.guld > 0 || bit.gig_stats.current.bra > 0 || bit.gig_stats.current.bomb > 0);
-
+                
                 return (
                   <div key={bit.id} draggable={!performedAt} onDragStart={(e) => onDragStart(e, index)} onDragOver={(e) => onDragOver(e, index)} onDrop={(e) => onDrop(e, index)} className={`p-2.5 md:p-3 bg-neutral-950 border-l-4 border-neutral-800 border-y border-r rounded-lg flex items-center justify-between ${!performedAt ? 'cursor-grab active:cursor-grabbing hover:border-purple-500/40' : ''}`}>
                     <div className="flex items-center gap-2 md:gap-2.5 w-full">
+                      
                       {!performedAt && <GripVertical size={16} className="text-neutral-600 hidden md:block" />}
+                      
                       {!performedAt && (
                         <div className="flex flex-col gap-1 md:hidden bg-neutral-900 rounded p-1">
                           <button onClick={(e) => { e.stopPropagation(); moveBit(index, 'up'); }} disabled={index === 0} className="text-neutral-500 hover:text-white disabled:opacity-20"><ChevronUp size={16}/></button>
                           <button onClick={(e) => { e.stopPropagation(); moveBit(index, 'down'); }} disabled={index === setlistBits.length - 1} className="text-neutral-500 hover:text-white disabled:opacity-20"><ChevronDown size={16}/></button>
                         </div>
                       )}
+
                       <div className="flex-1">
                         <div className="flex items-center justify-between pr-1 md:pr-2 mb-0.5 md:mb-1">
                           <h4 className="text-xs md:text-sm font-semibold text-white flex items-center gap-2">
-                            <span className="text-purple-400 mr-1 md:mr-2">{index + 1}.</span>
-                            {bit.title}
+                            <span className="text-purple-400 mr-1 md:mr-2">{index + 1}.</span>{bit.title}
                             {hasSwipes && (
                               <span title="Power Ranking" className="flex items-center gap-0.5 text-[9px] font-black text-orange-400 bg-orange-500/10 px-1 rounded border border-orange-500/20">
                                 <Activity size={8} /> {powerScore.toFixed(1)}
