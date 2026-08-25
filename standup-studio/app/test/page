@@ -1,0 +1,17 @@
+"use client";
+import { useState } from "react";
+
+export default function TestPage() {
+  const [count, setCount] = useState(0);
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-black p-10">
+      <button 
+        onClick={() => setCount(c => c + 1)} 
+        className="bg-blue-600 text-white text-4xl p-10 rounded-3xl font-bold"
+      >
+        Klick-test: {count}
+      </button>
+    </div>
+  );
+}
