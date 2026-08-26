@@ -1,10 +1,10 @@
 "use client";
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Sparkles, Save, Check, Plus, Tag as TagIcon, Loader2,
   BotMessageSquare, X, CornerDownRight, Star, ShieldAlert,
-  Layers, Smile, AlignLeft, Clock, History, Activity, RotateCcw, Trash2
+  Layers, Smile, AlignLeft, Clock, History, Activity, RotateCcw, Trash2, ArrowLeft
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import ReactMarkdown from "react-markdown";
@@ -13,6 +13,9 @@ function WorkshopContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const urlId = searchParams.get("id");
+  
+  // Referens för att kunna "klicka" på sparaknappen via kortkommando
+  const saveButtonRef = useRef<HTMLButtonElement>(null);
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const [title, setTitle] = useState("");
@@ -30,12 +33,10 @@ function WorkshopContent() {
   const [history, setHistory] = useState<{ date: string, text: string }[]>([]);
   const [lastSavedPremise, setLastSavedPremise] = useState("");
   const [showHistory, setShowHistory] = useState(false);
-
   const [gigStats, setGigStats] = useState<any>({
     current: { guld: 0, bra: 0, bomb: 0 },
     historical: { guld: 0, bra: 0, bomb: 0 }
   });
-
   const [isSaving, setIsSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -49,6 +50,18 @@ function WorkshopContent() {
       startNew();
     }
   }, [urlId]);
+
+  // NY: Kortkommando för att spara (Ctrl+S eller Cmd+S)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        saveButtonRef.current?.click();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const fetchBit = async (id: string) => {
     const { data, error } = await supabase.from("bits").select("*").eq("id", id).single();
@@ -76,11 +89,10 @@ function WorkshopContent() {
   const handleSave = async () => {
     setIsSaving(true);
     let updatedHistory = [...history];
-
     if (activeId && premise !== lastSavedPremise && lastSavedPremise.trim() !== "") {
       updatedHistory = [{ date: new Date().toISOString(), text: lastSavedPremise }, ...updatedHistory];
     }
-
+    
     const payload = {
       title, premise, status, priority, mood, role,
       risk_level: riskLevel, format, duration_seconds: durationSeconds,
@@ -190,20 +202,20 @@ function WorkshopContent() {
     }
   };
 
-  const removeTag = (tagToRemove: string) => { 
-    setTags(tags.filter(t => t !== tagToRemove)); 
+  const removeTag = (tagToRemove: string) => {
+    setTags(tags.filter(t => t !== tagToRemove));
   };
-  
+
   const addComedyTag = () => { setComedyTags([...comedyTags, ""]); };
   
   const updateComedyTag = (index: number, value: string) => {
-    const newTags = [...comedyTags]; 
-    newTags[index] = value; 
+    const newTags = [...comedyTags];
+    newTags[index] = value;
     setComedyTags(newTags);
   };
-  
-  const removeComedyTag = (index: number) => { 
-    setComedyTags(comedyTags.filter((_, i) => i !== index)); 
+
+  const removeComedyTag = (index: number) => {
+    setComedyTags(comedyTags.filter((_, i) => i !== index));
   };
 
   const handleAnalyze = async () => {
@@ -233,6 +245,17 @@ function WorkshopContent() {
   return (
     <div className="h-full flex flex-col md:flex-row bg-neutral-950 text-white">
       <div className="flex-1 p-6 md:p-10 flex flex-col border-r border-neutral-800 relative h-full overflow-y-auto">
+        
+        {/* NY: Tillbakaknapp */}
+        <div className="mb-6 flex items-center justify-between">
+          <button 
+            onClick={() => router.push('/vault')} 
+            className="flex items-center gap-2 text-neutral-400 hover:text-white transition-colors text-sm font-medium"
+          >
+            <ArrowLeft size={16} /> Tillbaka till Vault
+          </button>
+        </div>
+
         <div className="flex justify-between items-center mb-4 shrink-0">
           <input
             type="text" placeholder="Arbetstitel..."
@@ -265,12 +288,11 @@ function WorkshopContent() {
                 </button>
               </>
             )}
-            
             <button onClick={handleDuplicate} className="hidden md:flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-medium text-neutral-400 hover:text-white hover:bg-neutral-900 border border-neutral-800 transition-all">
               <Plus size={14} /> Ny kopia
             </button>
-            
             <button
+              ref={saveButtonRef}
               onClick={handleSave} disabled={isSaving || !title}
               className={`flex items-center gap-2 px-5 py-2 rounded-lg text-xs font-bold transition-all ${saved ? "bg-green-600 text-white" : "bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-950/40"} ${(isSaving || !title) ? "opacity-50 cursor-not-allowed" : ""}`}
             >
@@ -403,11 +425,11 @@ function WorkshopContent() {
           value={premise} onChange={(e) => setPremise(e.target.value)}
         />
 
-        {/* PUNCHLINES / FÖLJDSKÄMT */}
+        {/* PUNCHLINES/FÖLJDSKÄMT */}
         <div className="shrink-0 border-t border-neutral-800/60 pt-6">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-xs font-bold text-neutral-500 uppercase tracking-wider flex items-center gap-2">
-              <CornerDownRight size={14} /> Följdskämt / Punchlines / Tags
+              <CornerDownRight size={14} /> Följdskämt/Punchlines / Tags
             </h3>
           </div>
           <div className="space-y-2.5 mb-3">
@@ -416,8 +438,8 @@ function WorkshopContent() {
                 <div className="mt-2 text-neutral-600"><CornerDownRight size={14} /></div>
                 <textarea
                   className="flex-1 bg-neutral-900 border border-neutral-800 rounded-lg p-2.5 text-xs text-neutral-200 placeholder-neutral-600 outline-none focus:border-blue-500/50 resize-none min-h-[50px]"
-                  placeholder={`Följdskämt #${index + 1}...`} 
-                  value={tag} 
+                  placeholder={`Följdskämt #${index + 1}...`}
+                  value={tag}
                   onChange={(e) => updateComedyTag(index, e.target.value)}
                 />
                 <button onClick={() => removeComedyTag(index)} className="mt-2 text-neutral-600 hover:text-red-400 opacity-0 group-hover:opacity-100 p-1.5"><X size={16} /></button>
@@ -472,13 +494,19 @@ function WorkshopContent() {
         </div>
         <div className="flex-1">
           {isAnalyzing ? (
-            <div className="flex flex-col items-center justify-center h-40 text-neutral-500 gap-3"><Loader2 className="animate-spin text-blue-500" size={24} /><p className="text-xs">Coachar premissen...</p></div>
+            <div className="flex flex-col items-center justify-center h-40 text-neutral-500 gap-3">
+              <Loader2 className="animate-spin text-blue-500" size={24} />
+              <p className="text-xs">Coachar premissen...</p>
+            </div>
           ) : aiFeedback ? (
             <div className="text-neutral-300 text-xs leading-relaxed prose prose-invert prose-p:mb-3 prose-headings:text-blue-400 prose-headings:text-sm prose-li:mb-1">
               <ReactMarkdown>{aiFeedback}</ReactMarkdown>
             </div>
           ) : (
-            <div className="text-center text-neutral-600 mt-10"><BotMessageSquare size={32} className="mx-auto mb-2 opacity-30" /><p className="text-xs">Klicka för analys av punchlines, setup och luckor.</p></div>
+            <div className="text-center text-neutral-600 mt-10">
+              <BotMessageSquare size={32} className="mx-auto mb-2 opacity-30" />
+              <p className="text-xs">Klicka för analys av punchlines, setup och luckor.</p>
+            </div>
           )}
         </div>
       </div>
