@@ -1,4 +1,5 @@
 "use client";
+
 import { useState, useEffect, Suspense, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -16,7 +17,7 @@ function WorkshopContent() {
   
   // Referens för att kunna "klicka" på sparaknappen via kortkommando
   const saveButtonRef = useRef<HTMLButtonElement>(null);
-
+  
   const [activeId, setActiveId] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [premise, setPremise] = useState("");
@@ -33,10 +34,12 @@ function WorkshopContent() {
   const [history, setHistory] = useState<{ date: string, text: string }[]>([]);
   const [lastSavedPremise, setLastSavedPremise] = useState("");
   const [showHistory, setShowHistory] = useState(false);
+  
   const [gigStats, setGigStats] = useState<any>({
     current: { guld: 0, bra: 0, bomb: 0 },
-    historical: { guld: 0, bra: 0, bomb: 0 }
+    historical: { guld: 0, bra: 0, bomb: 0}
   });
+  
   const [isSaving, setIsSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -69,7 +72,12 @@ function WorkshopContent() {
       setTitle(data.title || "");
       setPremise(data.premise || "");
       setLastSavedPremise(data.premise || "");
-      setStatus(data.status || "Råidé");
+      
+      // Logik: Om skämtet hade den gamla statusen "Testad", gör om den till "Redo"
+      let dbStatus = data.status || "Råidé";
+      if (dbStatus.toLowerCase() === 'testad') dbStatus = 'Redo';
+      setStatus(dbStatus);
+      
       setPriority(Number(data.priority) || 1);
       setMood(data.mood || "Avmätt");
       setRole(data.role || "Story");
@@ -79,7 +87,7 @@ function WorkshopContent() {
       setTags(Array.isArray(data.tags) ? data.tags : []);
       setComedyTags(Array.isArray(data.comedy_tags) ? data.comedy_tags : []);
       setHistory(Array.isArray(data.history) ? data.history : []);
-      setGigStats(data.gig_stats || { current: { guld: 0, bra: 0, bomb: 0 }, historical: { guld: 0, bra: 0, bomb: 0 } });
+      setGigStats(data.gig_stats || { current: { guld: 0, bra: 0, bomb: 0}, historical: { guld: 0, bra: 0, bomb: 0 } });
       setAiFeedback(null);
     } else if (error) {
       console.error("Kunde inte hämta skämtet:", error);
@@ -136,7 +144,7 @@ function WorkshopContent() {
     if (!window.confirm("Vill du nollställa den aktuella statistiken? (Total historik sparas i parentes)")) return;
     const resetStats = {
       ...gigStats,
-      current: { guld: 0, bra: 0, bomb: 0 }
+      current: { guld: 0, bra: 0, bomb: 0}
     };
     setGigStats(resetStats);
     if (activeId) {
@@ -178,7 +186,7 @@ function WorkshopContent() {
     setTags([]);
     setComedyTags([]);
     setHistory([]);
-    setGigStats({ current: { guld: 0, bra: 0, bomb: 0 }, historical: { guld: 0, bra: 0, bomb: 0 } });
+    setGigStats({ current: { guld: 0, bra: 0, bomb: 0}, historical: { guld: 0, bra: 0, bomb: 0 } });
     setTagInput("");
     setAiFeedback(null);
     window.history.replaceState(null, "", "/workshop");
@@ -189,7 +197,7 @@ function WorkshopContent() {
     setTitle(title ? title + " - kopia" : "Ny kopia");
     setSaved(false);
     setHistory([]);
-    setGigStats({ current: { guld: 0, bra: 0, bomb: 0 }, historical: { guld: 0, bra: 0, bomb: 0 } });
+    setGigStats({ current: { guld: 0, bra: 0, bomb: 0 }, historical: { guld: 0, bra: 0, bomb: 0} });
     window.history.replaceState(null, "", "/workshop");
   };
 
@@ -207,13 +215,11 @@ function WorkshopContent() {
   };
 
   const addComedyTag = () => { setComedyTags([...comedyTags, ""]); };
-  
   const updateComedyTag = (index: number, value: string) => {
     const newTags = [...comedyTags];
     newTags[index] = value;
     setComedyTags(newTags);
   };
-
   const removeComedyTag = (index: number) => {
     setComedyTags(comedyTags.filter((_, i) => i !== index));
   };
@@ -257,31 +263,31 @@ function WorkshopContent() {
         </div>
 
         <div className="flex justify-between items-center mb-4 shrink-0">
-          <input
-            type="text" placeholder="Arbetstitel..."
-            className="bg-transparent text-3xl font-bold outline-none text-white placeholder-neutral-700 w-full"
-            value={title} onChange={(e) => setTitle(e.target.value)}
+          <input 
+            type="text" placeholder="Arbetstitel..." 
+            className="bg-transparent text-3xl font-bold outline-none text-white placeholder-neutral-700 w-full" 
+            value={title} onChange={(e) => setTitle(e.target.value)} 
           />
           <div className="flex items-center gap-2 shrink-0">
             {activeId && (
               <>
-                <button
-                  onClick={() => router.push(`/setlists?addBit=${activeId}`)}
-                  title="Lägg till i Setlist"
+                <button 
+                  onClick={() => router.push(`/setlists?addBit=${activeId}`)} 
+                  title="Lägg till i Setlist" 
                   className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-neutral-400 hover:text-white hover:bg-neutral-900 border border-neutral-800 transition-all"
                 >
                   <Layers size={14} /> <span className="hidden sm:inline">Till Setlist</span>
                 </button>
-                <button
-                  onClick={() => router.push(`/rutinbyggaren?addBit=${activeId}`)}
-                  title="Lägg till i Rutinbyggaren"
+                <button 
+                  onClick={() => router.push(`/rutinbyggaren?addBit=${activeId}`)} 
+                  title="Lägg till i Rutinbyggaren" 
                   className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-neutral-400 hover:text-white hover:bg-neutral-900 border border-neutral-800 transition-all"
                 >
                   <AlignLeft size={14} /> <span className="hidden sm:inline">Till Rutinbyggaren</span>
                 </button>
-                <button
-                  onClick={handleDelete}
-                  title="Släng skämt"
+                <button 
+                  onClick={handleDelete} 
+                  title="Släng skämt" 
                   className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-neutral-500 hover:text-red-400 hover:bg-red-500/10 border border-neutral-800 hover:border-red-500/30 transition-all"
                 >
                   <Trash2 size={14} /> <span className="hidden sm:inline">Släng</span>
@@ -291,9 +297,9 @@ function WorkshopContent() {
             <button onClick={handleDuplicate} className="hidden md:flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-medium text-neutral-400 hover:text-white hover:bg-neutral-900 border border-neutral-800 transition-all">
               <Plus size={14} /> Ny kopia
             </button>
-            <button
+            <button 
               ref={saveButtonRef}
-              onClick={handleSave} disabled={isSaving || !title}
+              onClick={handleSave} disabled={isSaving || !title} 
               className={`flex items-center gap-2 px-5 py-2 rounded-lg text-xs font-bold transition-all ${saved ? "bg-green-600 text-white" : "bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-950/40"} ${(isSaving || !title) ? "opacity-50 cursor-not-allowed" : ""}`}
             >
               {saved ? <Check size={14} /> : <Save size={14} />}
@@ -309,7 +315,8 @@ function WorkshopContent() {
             <select value={status} onChange={(e) => setStatus(e.target.value)} className="bg-neutral-950 border border-neutral-800 text-xs font-semibold text-neutral-300 rounded px-2 py-1 outline-none cursor-pointer">
               <option value="Råidé">Råidé</option>
               <option value="Omarbeta">Omarbeta</option>
-              <option value="Testad">Testad</option>
+              <option value="Testa">Testa</option>
+              <option value="Redo">Redo</option>
               <option value="Klubbklar">Klubbklar</option>
               <option value="Burned">Burned</option>
             </select>
@@ -468,8 +475,8 @@ function WorkshopContent() {
                   <div key={i} className="bg-neutral-900/40 border border-neutral-800/80 rounded-lg p-4 group hover:border-neutral-700 transition-colors">
                     <div className="flex justify-between items-center mb-3 border-b border-neutral-800/50 pb-2">
                       <span className="text-[11px] font-mono text-neutral-500">Sparad: {new Date(h.date).toLocaleString("sv-SE", { dateStyle: "short", timeStyle: "short" })}</span>
-                      <button
-                        onClick={() => { if (window.confirm("Vill du ersätta din nuvarande text med denna gamla version?")) { setPremise(h.text); } }}
+                      <button 
+                        onClick={() => { if (window.confirm("Vill du ersätta din nuvarande text med denna gamla version?")) { setPremise(h.text); } }} 
                         className="text-[10px] font-bold uppercase tracking-wider text-blue-400 hover:text-blue-300 bg-blue-900/20 hover:bg-blue-900/40 px-2.5 py-1 rounded transition-colors opacity-0 group-hover:opacity-100"
                       >
                         Återställ
@@ -489,9 +496,10 @@ function WorkshopContent() {
         <div className="flex items-center justify-between border-b border-neutral-800 pb-4">
           <div className="flex items-center gap-2 text-blue-400"><Sparkles size={18} /><h2 className="font-semibold text-base">AI-Anatomi</h2></div>
           <button onClick={handleAnalyze} disabled={isAnalyzing} className="bg-blue-600/20 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-500/30 p-2 rounded-lg transition-all disabled:opacity-50">
-            {isAnalyzing ? <Loader2 size={16} className="animate-spin" /> : <BotMessageSquare size={16} />}
+            {isAnalyzing ? <Loader2 size={16} className="animate-spin" /> : <BotMessageSquare size={16}/>}
           </button>
         </div>
+        
         <div className="flex-1">
           {isAnalyzing ? (
             <div className="flex flex-col items-center justify-center h-40 text-neutral-500 gap-3">
