@@ -4,7 +4,7 @@ import OpenAI from "openai";
 // OBS: Om du har skapat filen comedyTheory.ts, avkommentera raden nedan:
 // import { comedyTheory } from "../../../lib/comedyTheory";
 // Annars använder vi en tom sträng så länge så att appen inte kraschar:
-const comedyTheory = ""; 
+const comedyTheory = "";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -15,10 +15,13 @@ export async function POST(req: Request) {
     const { premise, isMeta } = await req.json();
 
     if (!premise || premise.trim() === "") {
-      return NextResponse.json({ feedback: "Ingen text att analysera.", suggestedTags: [] }, { status: 400 });
+      return NextResponse.json(
+        { feedback: "Ingen text att analysera.", suggestedTags: [] },
+        { status: 400 }
+      );
     }
 
-    const masterPrompt = `Du är "Comedy Doctor 2.0", en hänsynslös men stöttande standup-redaktör inbyggd i appen Standup Studio. Ditt mål är ordekonomi, tajming och kontrast. 
+    const masterPrompt = `Du är "Comedy Doctor 2.0", en hänsynslös men stöttande standup-redaktör inbyggd i appen Standup Studio. Ditt mål är ordekonomi, tajming och kontrast.
 
 HÄR ÄR DITT TEORETISKA RAMVERK:
 ${comedyTheory}
@@ -27,13 +30,34 @@ ${comedyTheory}
 
 [ABSOLUTA REGLER FÖR DITT BEMÖTANDE OCH INNEHÅLL]
 1. Håll din persona: Var kall, analytisk och direkt. Inget "Live, laugh, love"-flams.
-2. INGA WACKY PROPS ELLER PÅHITTADE ORD: Om komikern skämtar om HR, använd riktiga, stela HR-termer. Hitta aldrig på tramsord som "organbankir" eller "kontorsslav". 
+2. INGA WACKY PROPS ELLER PÅHITTADE ORD: Om komikern skämtar om HR, använd riktiga, stela HR-termer. Hitta aldrig på tramsord som "organbankir" eller "kontorsslav".
 3. Hitta mörkret: Standup bygger på smärta. Identifiera den faktiska misären i subtexten (t.ex. "Din kropp betraktas som medicinskt skräp").
 
-[EXEMPEL PÅ KORREKT TON]
-Om skämtet är: "Jag kallar min tjej för lilla duva, spelar ingen roll var jag släpper av henne, hon hittar ändå hem."
-RÄTT undertext: "Du är en psykopat som ser kidnappning som en söt relationslek."
-FEL undertext (GÖR ALDRIG SÅ HÄR): "Ibland kan kärleken leda till oväntade missförstånd!"
+[EXEMPELBANK: SÅ HÄR ANALYSERAR EN RIKTIG COMEDY DOCTOR]
+Använd dessa exempel för att förstå exakt vilken nivå av kyla, logik och mörker som förväntas av dig.
+
+EXEMPEL 1: Skydda formen (Nyhetsuppläsning)
+Premiss: "Cementa nekas prövningstillstånd... vilket innebär risk för cementkris enligt TT. Redan i dagsläget ligger ett tiotal kroppar och väntar på att sänkas ner i Nybroviken."
+RÄTT: Bevara den torra TT-nyhetsrytmen exakt i din ombearbetning. 
+FEL: Att skriva om det till indirekt tal eller löptext så att "nyhetskänslan" försvinner.
+FEL: Att i Trigger-analysen föreslå att "Nybroviken" ska flyttas sist. LÄS TEXTEN: "Nybroviken" ligger REDAN sist. 
+
+EXEMPEL 2: Trope Subversion och Subtext (Tatueringar)
+Premiss: "Min tjej ville tatuera in mitt namn. Jag sa nej. Det är bara sjömän och prostituerade som har mitt namn intatuerat."
+RÄTT diagnostik: Detta är en "Trope Subversion". Komikern kapar ett historiskt talesätt ("bara sjömän och prostituerade tatuerar sig") genom att smyga in "mitt namn", vilket byter kontext till ett mörkt dubbelliv.
+RÄTT Misplaced Sincerity: Leverera skämtet med genuin och naiv omtanke om flickvännen för att dölja mörkret (Bad Boy-attityd förstör skämtet).
+
+EXEMPEL 3: Status-skiften och ordekonomi (Duvan)
+Premiss: "Jag kallar min flickvän för min lilla duva eftersom det spelar ingen roll var man släpper av henne, hon hittar ändå alltid hem."
+RÄTT PIJ-Q (Stilistik): Byt "släpper av" mot det mörkare "dumpar".
+RÄTT PIJ-Q (Status): "Vad händer om vi byter ut flickvännen mot din MAMMA som dumpade dig i skogen?" (Detta skapar ett briljant lågstatus/trauma-perspektiv).
+FEL (Kill Your Darlings): Att bara kopiera texten rakt av. Du MÅSTE stryka förklarande ord som "eftersom".
+
+EXEMPEL 4: Inga "Wacky Props" (Donationsregistret)
+Premiss: "Anmälde mig till donationsregistret. Fick ett mail: 'Vi har valt att gå vidare med andra kandidater'."
+RÄTT PIJ-Q: Utmana komikern att hitta en ännu kallare HR-klyscha, t.ex. "Din profil matchar inte våra nuvarande behov."
+FEL PIJ-Q: Att föreslå tramsiga Kalle Anka-ord som "organbankir".
+FEL (Förstörd Safety): Att föreslå att byta ut "kandidater" mot "organdonatorer". Ordet "kandidater" är ju hela HR-krocken. Utan det dör parodin!
 
 [JSON-STRUKTUR OCH FÄLT-INSTRUKTIONER]
 Du MÅSTE svara med ett giltigt JSON-objekt enligt exakt denna struktur.
@@ -66,7 +90,7 @@ Du MÅSTE svara med ett giltigt JSON-objekt enligt exakt denna struktur.
         { role: "system", content: masterPrompt },
         { role: "user", content: premise },
       ],
-      temperature: 0.7, 
+      temperature: 0.7,
     });
 
     const aiData = JSON.parse(response.choices[0].message.content || "{}");
@@ -81,14 +105,12 @@ Du MÅSTE svara med ett giltigt JSON-objekt enligt exakt denna struktur.
 * **Trigger-analys:** ${aiData.akuten?.trigger_analys || ""}
 * **Kill Your Darlings:** ${aiData.akuten?.kill_your_darlings || ""}
 
----
 ### DEL 2: TEORETISK FÖRDJUPNING
 * **Diagnos & Metaskämtet:** ${aiData.fordjupning?.diagnos_och_metaskamt || ""}
 * **Stilistiska extremvärden:** ${aiData.fordjupning?.stilistiska_extremvarden || ""}
 * **Misplaced Sincerity:** ${aiData.fordjupning?.misplaced_sincerity || ""}
 * **Överdrift/Underdrift-Skala:** ${aiData.fordjupning?.overdrift_underdrift_skala || ""}
 
----
 ### DEL 3: SKRIV-KATALYSATORN
 * **PIJ-Q 1:** ${aiData.skriv_katalysatorn?.pij_q1 || ""}
 * **PIJ-Q 2:** ${aiData.skriv_katalysatorn?.pij_q2 || ""}
@@ -101,6 +123,9 @@ Du MÅSTE svara med ett giltigt JSON-objekt enligt exakt denna struktur.
 
   } catch (error: any) {
     console.error("Analys API error:", error);
-    return NextResponse.json({ feedback: "Kunde inte nå AI:n för analys." }, { status: 500 });
+    return NextResponse.json(
+      { feedback: "Kunde inte nå AI:n för analys." },
+      { status: 500 }
+    );
   }
 }
