@@ -15,8 +15,9 @@ function WorkshopContent() {
   const searchParams = useSearchParams();
   const urlId = searchParams.get("id");
   
-  // Referens för att kunna "klicka" på sparaknappen via kortkommando
+  // Referenser
   const saveButtonRef = useRef<HTMLButtonElement>(null);
+  const isDuplicatingRef = useRef(false); // NY: Vår sköld för att skydda texten vid kopiering
   
   const [activeId, setActiveId] = useState<string | null>(null);
   const [title, setTitle] = useState("");
@@ -28,7 +29,7 @@ function WorkshopContent() {
   const [riskLevel, setRiskLevel] = useState("Klubb");
   const [format, setFormat] = useState("observation");
   const [durationSeconds, setDurationSeconds] = useState<number>(20);
-  const [isMeta, setIsMeta] = useState<boolean>(false); // NY: Meta-flagga
+  const [isMeta, setIsMeta] = useState<boolean>(false);
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
   const [comedyTags, setComedyTags] = useState<string[]>([]);
@@ -51,7 +52,12 @@ function WorkshopContent() {
       setActiveId(urlId);
       fetchBit(urlId);
     } else {
-      startNew();
+      // NY LOGIK: Om vi duplicerar just nu, låt texten vara kvar. Annars, starta tomt!
+      if (isDuplicatingRef.current) {
+        isDuplicatingRef.current = false; // Fäll ner skölden igen
+      } else {
+        startNew();
+      }
     }
   }, [urlId]);
 
@@ -84,7 +90,7 @@ function WorkshopContent() {
       setRiskLevel(data.risk_level || "Klubb");
       setFormat(data.format || "observation");
       setDurationSeconds(data.duration_seconds !== null ? Number(data.duration_seconds) : 20);
-      setIsMeta(data.is_meta || false); // NY: Hämta Meta-flagga
+      setIsMeta(data.is_meta || false);
       setTags(Array.isArray(data.tags) ? data.tags : []);
       setComedyTags(Array.isArray(data.comedy_tags) ? data.comedy_tags : []);
       setHistory(Array.isArray(data.history) ? data.history : []);
@@ -105,7 +111,7 @@ function WorkshopContent() {
     const payload = {
       title, premise, status, priority, mood, role,
       risk_level: riskLevel, format, duration_seconds: durationSeconds,
-      is_meta: isMeta, // NY: Spara Meta-flagga
+      is_meta: isMeta, 
       tags: tags || [], comedy_tags: comedyTags || [], history: updatedHistory,
       gig_stats: gigStats
     };
@@ -124,7 +130,7 @@ function WorkshopContent() {
         setHistory(updatedHistory);
         showSavedFeedback();
         setActiveId(String(data.id));
-        window.history.replaceState(null, "", `/workshop?id=${data.id}`);
+        router.replace(`/workshop?id=${data.id}`); // Bytt till router.replace
       } else if (error) { alert("Databasfel: " + error.message); }
     }
     setIsSaving(false);
@@ -185,23 +191,24 @@ function WorkshopContent() {
     setRiskLevel("Klubb");
     setFormat("observation");
     setDurationSeconds(20);
-    setIsMeta(false); // NY: Återställ
+    setIsMeta(false);
     setTags([]);
     setComedyTags([]);
     setHistory([]);
     setGigStats({ current: { guld: 0, bra: 0, bomb: 0}, historical: { guld: 0, bra: 0, bomb: 0 } });
     setTagInput("");
     setAiFeedback(null);
-    window.history.replaceState(null, "", "/workshop");
+    router.replace("/workshop"); // Rensar URL
   };
 
   const handleDuplicate = () => {
+    isDuplicatingRef.current = true; // HÄR LYFTER VI SKÖLDEN!
     setActiveId(null);
     setTitle(title ? title + " - kopia" : "Ny kopia");
     setSaved(false);
     setHistory([]);
     setGigStats({ current: { guld: 0, bra: 0, bomb: 0 }, historical: { guld: 0, bra: 0, bomb: 0} });
-    window.history.replaceState(null, "", "/workshop");
+    router.replace("/workshop"); // Uppdaterar URL, men useEffect låter texten vara kvar
   };
 
   const handleAddTag = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -227,7 +234,7 @@ function WorkshopContent() {
     setComedyTags(comedyTags.filter((_, i) => i !== index));
   };
 
- const handleAnalyze = async () => {
+  const handleAnalyze = async () => {
     if (!premise || premise.length < 10) { alert("Skriv lite mer premiss först!"); return; }
     setIsAnalyzing(true);
     
@@ -236,7 +243,7 @@ function WorkshopContent() {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
           premise: premise + "\n\nTags:\n" + comedyTags.join("\n"),
-          isMeta: isMeta // Här skickar vi med värdet från checkboxen!
+          isMeta: isMeta 
         }),
       });
       const data = await res.json();
@@ -387,7 +394,6 @@ function WorkshopContent() {
             </select>
           </div>
           
-          {/* NY: Meta-Checkbox */}
           <div className="flex flex-col gap-1 justify-center pl-2 border-l border-neutral-800/50">
             <label className="text-[10px] font-bold text-neutral-400 hover:text-white transition-colors flex items-center gap-1.5 cursor-pointer h-full">
               <input 
