@@ -33,6 +33,7 @@ ${comedyTheory}
 2. INGA WACKY PROPS ELLER PÅHITTADE ORD: Om komikern skämtar om HR, använd riktiga, stela HR-termer. Hitta aldrig på tramsord som "organbankir" eller "kontorsslav".
 3. Hitta mörkret: Standup bygger på smärta. Identifiera den faktiska misären i subtexten (t.ex. "Din kropp betraktas som medicinskt skräp").
 4. META OCH ANTI-HUMOR: Om flaggan är 'true', behandla skämtet som anti-humor. Leta INTE efter en smart, listig eller formell punchline. Uppmuntra istället den medvetna oelegansen, antiklimaxet och hur komikern kan maximera den obekväma tystnaden när publiken inser att det inte kommer ett "riktigt" skämt.
+5. Håll det kort och snabbläst: Skriv i korta, slagkraftiga meningar. Undvik akademiskt fikonspråk och långa utläggningar. Skriv som en stressad men genial redaktör: rakt, tydligt och talspråkligt.
 
 [EXEMPELBANK: SÅ HÄR ANALYSERAR EN RIKTIG COMEDY DOCTOR]
 Använd dessa exempel för att förstå exakt vilken nivå av kyla, logik och mörker som förväntas av dig.
@@ -64,11 +65,8 @@ EXEMPEL 5: Insats-krocken och bevarande av "Tråkighet"
 Premiss: "Ett företag som får ersättning för att hjälpa arbetslösa att hitta jobb har polisanmälts för att olovligen ha läst drygt 23 000 cv:n hos Arbetsförmedlingen. Det är ännu oklart vem som kommer spela huvudrollen i filmatiseringen."
 RÄTT diagnostik: Krocken ligger i "Insatserna" (Stakes). Världens tråkigaste och mest byråkratiska white-collar brott behandlas med dramaturgin av en Hollywood-heist. 
 FEL Kill Your Darlings: Att stryka detaljerna om Arbetsförmedlingen och ersättningen. Dessa "tråkiga" detaljer MÅSTE vara kvar för att bygga upp fallhöjden till punchlinen.
-RÄTT PIJ-Q (Extrapolering): Utmana komikern att applicera ännu mer dramaturgi på det tråkiga brottet (t.ex. att Michael Bay regisserar eller vem som spelar HR-chefen).EXEMPEL 5: Insats-krocken och bevarande av "Tråkighet"
-Premiss: "Ett företag som får ersättning för att hjälpa arbetslösa att hitta jobb har polisanmälts för att olovligen ha läst drygt 23 000 cv:n hos Arbetsförmedlingen. Det är ännu oklart vem som kommer spela huvudrollen i filmatiseringen."
-RÄTT diagnostik: Krocken ligger i "Insatserna" (Stakes). Världens tråkigaste och mest byråkratiska white-collar brott behandlas med dramaturgin av en Hollywood-heist. 
-FEL Kill Your Darlings: Att stryka detaljerna om Arbetsförmedlingen och ersättningen. Dessa "tråkiga" detaljer MÅSTE vara kvar för att bygga upp fallhöjden till punchlinen.
 RÄTT PIJ-Q (Extrapolering): Utmana komikern att applicera ännu mer dramaturgi på det tråkiga brottet (t.ex. att Michael Bay regisserar eller vem som spelar HR-chefen).
+
 [DEN KOMISKA VERKTYGSLÅDAN FÖR PIJ-FRÅGOR]
 När du formulerar PIJ-Q 2 och PIJ-Q 3, MÅSTE du välja de två verktyg från denna lista som skapar störst krock (Violation) för just detta skämt:
 1. Statusskifte: Vänd på vem som är offer/förövare (högstatus vs lågstatus) för att hitta självironi.
@@ -76,6 +74,7 @@ När du formulerar PIJ-Q 2 och PIJ-Q 3, MÅSTE du välja de två verktyg från d
 3. Extrapolering: Dra premissens regel till sin absolut mest absurda, logiska extrempunkt.
 4. Reaktions-krock: Utmana komikern att visa totalt fel känsla i leveransen (t.ex. byråkratisk kyla inför något emotionellt, eller eufori inför ett avslag).
 5. Definition-Shift: Bokstavstolka eller missförstå "Safety"-ordet i premissen medvetet.
+6. Om-casting & Fallhöjd: Utvärdera om skämtets "casting" är optimal. Utmana komikern att byta ut en referens (person, plats, varumärke) mot något som gör statusgapet ännu mer extremt. Föreslå också att lägga till bombastiska titlar (t.ex. "den internationella superstjärnan") om det ökar fallhöjden inför punchlinen. Ordekonomi får inte ske på bekostnad av kontrast!
 
 [JSON-STRUKTUR OCH FÄLT-INSTRUKTIONER]
 Du MÅSTE svara med ett giltigt JSON-objekt enligt exakt denna struktur.
@@ -85,7 +84,8 @@ Du MÅSTE svara med ett giltigt JSON-objekt enligt exakt denna struktur.
   "akuten": {
     "scenkaraktar": "<Beskriv karaktären utan klyschor.>",
     "undertext": "<Den brutala sanningen komikern döljer.>",
-    "trigger_analys": "<Ligger triggern sist? Beröm eller korrigera.>",
+    "trigger_analys": "<Ligger triggern sist? Om den ligger HELT RÄTT, lämna detta fält tomt (''). Om den ligger fel, korrigera och förklara.>",
+    "informationsbalans": "<Har setupen för mycket onödigt brus? ELLER saknas viktig kontext för att publiken ska förstå? Om balansen är perfekt, lämna detta fält tomt ('').>",
     "kill_your_darlings": "<Skriv en tajtare version. Stryk onödiga bindningsord, MEN du får ALDRIG stryka tråkiga/byråkratiska detaljer om skämtet bygger på en krock mellan det extremt vardagliga och det dramatiska. Bevara form exakt.>"
   },
   "fordjupning": {
@@ -114,18 +114,18 @@ Du MÅSTE svara med ett giltigt JSON-objekt enligt exakt denna struktur.
 
     const aiData = JSON.parse(response.choices[0].message.content || "{}");
 
-    // Formatera datan för ReactMarkdown i Workshopen med dubbla radbrytningar
-    const formattedFeedback = `
-> **Doktorns inre monolog:** _${aiData.intern_tankeprocess || "Analyserar mörkret..."}_
+    // Dölj fält som AI:n lämnat tomma (t.ex. om triggern redan är perfekt eller informationsbalansen sitter)
+    const triggerText = aiData.akuten?.trigger_analys ? `**Trigger-analys:** ${aiData.akuten.trigger_analys}\n\n` : "";
+    const infoText = aiData.akuten?.informationsbalans ? `**Informationsbalans:** ${aiData.akuten.informationsbalans}\n\n` : "";
 
+    // Formatera datan för ReactMarkdown
+    const formattedFeedback = `
 ### DEL 1: AKUTEN
 **Scenkaraktär:** ${aiData.akuten?.scenkaraktar || ""}
 
 **Undertext:** ${aiData.akuten?.undertext || ""}
 
-**Trigger-analys:** ${aiData.akuten?.trigger_analys || ""}
-
-**Kill Your Darlings:** ${aiData.akuten?.kill_your_darlings || ""}
+${infoText}${triggerText}**Kill Your Darlings:** ${aiData.akuten?.kill_your_darlings || ""}
 
 ### DEL 2: TEORETISK FÖRDJUPNING
 **Diagnos & Metaskämtet:** ${aiData.fordjupning?.diagnos_och_metaskamt || ""}
@@ -142,6 +142,9 @@ Du MÅSTE svara med ett giltigt JSON-objekt enligt exakt denna struktur.
 **PIJ-Q 2 (Struktur):** ${aiData.skriv_katalysatorn?.pij_q2 || ""}
 
 **PIJ-Q 3 (Struktur):** ${aiData.skriv_katalysatorn?.pij_q3 || ""}
+
+---
+> **Doktorns inre monolog:** _${aiData.intern_tankeprocess || "Analyserar mörkret..."}_
 `;
 
     return NextResponse.json({
