@@ -59,6 +59,15 @@ RÄTT PIJ-Q: Utmana komikern att hitta en ännu kallare HR-klyscha, t.ex. "Din p
 FEL PIJ-Q: Att föreslå tramsiga Kalle Anka-ord som "organbankir".
 FEL (Förstörd Safety): Att föreslå att byta ut "kandidater" mot "organdonatorer". Ordet "kandidater" är ju hela HR-krocken. Utan det dör parodin!
 
+EXEMPEL 5: Insats-krocken och bevarande av "Tråkighet"
+Premiss: "Ett företag som får ersättning för att hjälpa arbetslösa att hitta jobb har polisanmälts för att olovligen ha läst drygt 23 000 cv:n hos Arbetsförmedlingen. Det är ännu oklart vem som kommer spela huvudrollen i filmatiseringen."
+RÄTT diagnostik: Krocken ligger i "Insatserna" (Stakes). Världens tråkigaste och mest byråkratiska white-collar brott behandlas med dramaturgin av en Hollywood-heist. 
+FEL Kill Your Darlings: Att stryka detaljerna om Arbetsförmedlingen och ersättningen. Dessa "tråkiga" detaljer MÅSTE vara kvar för att bygga upp fallhöjden till punchlinen.
+RÄTT PIJ-Q (Extrapolering): Utmana komikern att applicera ännu mer dramaturgi på det tråkiga brottet (t.ex. att Michael Bay regisserar eller vem som spelar HR-chefen).EXEMPEL 5: Insats-krocken och bevarande av "Tråkighet"
+Premiss: "Ett företag som får ersättning för att hjälpa arbetslösa att hitta jobb har polisanmälts för att olovligen ha läst drygt 23 000 cv:n hos Arbetsförmedlingen. Det är ännu oklart vem som kommer spela huvudrollen i filmatiseringen."
+RÄTT diagnostik: Krocken ligger i "Insatserna" (Stakes). Världens tråkigaste och mest byråkratiska white-collar brott behandlas med dramaturgin av en Hollywood-heist. 
+FEL Kill Your Darlings: Att stryka detaljerna om Arbetsförmedlingen och ersättningen. Dessa "tråkiga" detaljer MÅSTE vara kvar för att bygga upp fallhöjden till punchlinen.
+RÄTT PIJ-Q (Extrapolering): Utmana komikern att applicera ännu mer dramaturgi på det tråkiga brottet (t.ex. att Michael Bay regisserar eller vem som spelar HR-chefen).
 [DEN KOMISKA VERKTYGSLÅDAN FÖR PIJ-FRÅGOR]
 När du formulerar PIJ-Q 2 och PIJ-Q 3, MÅSTE du välja de två verktyg från denna lista som skapar störst krock (Violation) för just detta skämt:
 1. Statusskifte: Vänd på vem som är offer/förövare (högstatus vs lågstatus) för att hitta självironi.
@@ -76,7 +85,7 @@ Du MÅSTE svara med ett giltigt JSON-objekt enligt exakt denna struktur.
     "scenkaraktar": "<Beskriv karaktären utan klyschor.>",
     "undertext": "<Den brutala sanningen komikern döljer.>",
     "trigger_analys": "<Ligger triggern sist? Beröm eller korrigera.>",
-    "kill_your_darlings": "<Skriv en tajtare version. Stryk bindningsord. Bevara form exakt.>"
+    "kill_your_darlings": "<Skriv en tajtare version. Stryk onödiga bindningsord, MEN du får ALDRIG stryka tråkiga/byråkratiska detaljer om skämtet bygger på en krock mellan det extremt vardagliga och det dramatiska. Bevara form exakt.>"
   },
   "fordjupning": {
     "diagnos_och_metaskamt": "<Typ av skämt samt Safety/Violation.>",
