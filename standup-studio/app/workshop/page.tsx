@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   Sparkles, Save, Check, Plus, Tag as TagIcon, Loader2,
   BotMessageSquare, X, CornerDownRight, Star, ShieldAlert,
-  Layers, Smile, AlignLeft, Clock, History, Activity, RotateCcw, Trash2, ArrowLeft
+  Layers, Smile, AlignLeft, Clock, History, Activity, RotateCcw, Trash2, ArrowLeft, Brain
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import ReactMarkdown from "react-markdown";
@@ -28,6 +28,7 @@ function WorkshopContent() {
   const [riskLevel, setRiskLevel] = useState("Klubb");
   const [format, setFormat] = useState("observation");
   const [durationSeconds, setDurationSeconds] = useState<number>(20);
+  const [isMeta, setIsMeta] = useState<boolean>(false); // NY: Meta-flagga
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
   const [comedyTags, setComedyTags] = useState<string[]>([]);
@@ -54,7 +55,7 @@ function WorkshopContent() {
     }
   }, [urlId]);
 
-  // NY: Kortkommando för att spara (Ctrl+S eller Cmd+S)
+  // Kortkommando för att spara (Ctrl+S eller Cmd+S)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
@@ -73,7 +74,6 @@ function WorkshopContent() {
       setPremise(data.premise || "");
       setLastSavedPremise(data.premise || "");
       
-      // Logik: Om skämtet hade den gamla statusen "Testad", gör om den till "Redo"
       let dbStatus = data.status || "Råidé";
       if (dbStatus.toLowerCase() === 'testad') dbStatus = 'Redo';
       setStatus(dbStatus);
@@ -84,6 +84,7 @@ function WorkshopContent() {
       setRiskLevel(data.risk_level || "Klubb");
       setFormat(data.format || "observation");
       setDurationSeconds(data.duration_seconds !== null ? Number(data.duration_seconds) : 20);
+      setIsMeta(data.is_meta || false); // NY: Hämta Meta-flagga
       setTags(Array.isArray(data.tags) ? data.tags : []);
       setComedyTags(Array.isArray(data.comedy_tags) ? data.comedy_tags : []);
       setHistory(Array.isArray(data.history) ? data.history : []);
@@ -104,6 +105,7 @@ function WorkshopContent() {
     const payload = {
       title, premise, status, priority, mood, role,
       risk_level: riskLevel, format, duration_seconds: durationSeconds,
+      is_meta: isMeta, // NY: Spara Meta-flagga
       tags: tags || [], comedy_tags: comedyTags || [], history: updatedHistory,
       gig_stats: gigStats
     };
@@ -183,6 +185,7 @@ function WorkshopContent() {
     setRiskLevel("Klubb");
     setFormat("observation");
     setDurationSeconds(20);
+    setIsMeta(false); // NY: Återställ
     setTags([]);
     setComedyTags([]);
     setHistory([]);
@@ -224,13 +227,17 @@ function WorkshopContent() {
     setComedyTags(comedyTags.filter((_, i) => i !== index));
   };
 
-  const handleAnalyze = async () => {
+ const handleAnalyze = async () => {
     if (!premise || premise.length < 10) { alert("Skriv lite mer premiss först!"); return; }
     setIsAnalyzing(true);
+    
     try {
       const res = await fetch("/api/analyze", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ premise: premise + "\n\nTags:\n" + comedyTags.join("\n") }),
+        body: JSON.stringify({ 
+          premise: premise + "\n\nTags:\n" + comedyTags.join("\n"),
+          isMeta: isMeta // Här skickar vi med värdet från checkboxen!
+        }),
       });
       const data = await res.json();
       if (data.feedback) setAiFeedback(data.feedback);
@@ -252,7 +259,7 @@ function WorkshopContent() {
     <div className="h-full flex flex-col md:flex-row bg-neutral-950 text-white">
       <div className="flex-1 p-6 md:p-10 flex flex-col border-r border-neutral-800 relative h-full overflow-y-auto">
         
-        {/* NY: Tillbakaknapp */}
+        {/* Tillbakaknapp */}
         <div className="mb-6 flex items-center justify-between">
           <button 
             onClick={() => router.push('/vault')} 
@@ -309,7 +316,7 @@ function WorkshopContent() {
         </div>
 
         {/* METADATA-KONTROLLER */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 mb-6 bg-neutral-900/70 border border-neutral-800/80 p-2.5 rounded-xl shrink-0">
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 mb-6 bg-neutral-900/70 border border-neutral-800/80 p-2.5 rounded-xl shrink-0">
           <div className="flex flex-col gap-1">
             <label className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider flex items-center gap-1"><TagIcon size={10} /> Status</label>
             <select value={status} onChange={(e) => setStatus(e.target.value)} className="bg-neutral-950 border border-neutral-800 text-xs font-semibold text-neutral-300 rounded px-2 py-1 outline-none cursor-pointer">
@@ -378,6 +385,20 @@ function WorkshopContent() {
               <option value="observation">Observation</option>
               <option value="story">Lång Story</option>
             </select>
+          </div>
+          
+          {/* NY: Meta-Checkbox */}
+          <div className="flex flex-col gap-1 justify-center pl-2 border-l border-neutral-800/50">
+            <label className="text-[10px] font-bold text-neutral-400 hover:text-white transition-colors flex items-center gap-1.5 cursor-pointer h-full">
+              <input 
+                type="checkbox" 
+                checked={isMeta} 
+                onChange={(e) => setIsMeta(e.target.checked)} 
+                className="w-3.5 h-3.5 rounded border-neutral-700 bg-neutral-950 text-blue-500 focus:ring-blue-500 cursor-pointer accent-blue-600"
+              />
+              <Brain size={12} className={isMeta ? "text-blue-400" : "text-neutral-600"} />
+              Meta
+            </label>
           </div>
         </div>
 
