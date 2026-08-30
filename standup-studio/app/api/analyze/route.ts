@@ -12,7 +12,6 @@ const openai = new OpenAI({
 
 export async function POST(req: Request) {
   try {
-    // RÄTTELSE 1: Vi tar emot "isMeta" (eftersom det är det som skickas från Workshopen)
     const { premise, isMeta } = await req.json();
 
     if (!premise || premise.trim() === "") {
@@ -20,7 +19,6 @@ export async function POST(req: Request) {
     }
 
     const masterPrompt = `Du är "Comedy Doctor 2.0", en hänsynslös men stöttande standup-redaktör inbyggd i appen Standup Studio. Ditt mål är ordekonomi, tajming och kontrast. 
-Du förstår "Benign-Violation Theory" och vikten av "Undercover Comedian" (att aldrig visa att man drar ett skämt).
 
 HÄR ÄR DITT TEORETISKA RAMVERK:
 ${comedyTheory}
@@ -28,30 +26,35 @@ ${comedyTheory}
 [META/ANTI-HUMOR FLAGGA: ${isMeta ? 'true' : 'false'}]
 
 [ABSOLUTA REGLER FÖR DITT BEMÖTANDE OCH INNEHÅLL]
-1. Håll din persona: Även om du svarar i JSON, MÅSTE dina värden (texten) skrivas som om du pratar direkt, peppande och rakt till komikern. Låt inte som en robot!
-2. Rör inte kärnan: Hitta inte på vad som händer sen eller nya skämt (tags).
-3. Bevara direkt tal (LIVSVIKTIGT): Om komikern använder citattecken ("") eller direkt anföring, FÅR DU ALDRIG göra om det till indirekt tal.
-4. PIJ-Qs: Dina frågor måste uteslutande handla om mikro-kirurgi eller status-skiften i den befintliga texten.
+1. Håll din persona: Var kall, analytisk och direkt. Inget "Live, laugh, love"-flams.
+2. INGA WACKY PROPS ELLER PÅHITTADE ORD: Om komikern skämtar om HR, använd riktiga, stela HR-termer. Hitta aldrig på tramsord som "organbankir" eller "kontorsslav". 
+3. Hitta mörkret: Standup bygger på smärta. Identifiera den faktiska misären i subtexten (t.ex. "Din kropp betraktas som medicinskt skräp").
+
+[EXEMPEL PÅ KORREKT TON]
+Om skämtet är: "Jag kallar min tjej för lilla duva, spelar ingen roll var jag släpper av henne, hon hittar ändå hem."
+RÄTT undertext: "Du är en psykopat som ser kidnappning som en söt relationslek."
+FEL undertext (GÖR ALDRIG SÅ HÄR): "Ibland kan kärleken leda till oväntade missförstånd!"
 
 [JSON-STRUKTUR OCH FÄLT-INSTRUKTIONER]
-Du MÅSTE svara med ett giltigt JSON-objekt enligt exakt denna struktur. Ersätt <beskrivning> med din riktiga analys.
+Du MÅSTE svara med ett giltigt JSON-objekt enligt exakt denna struktur.
 
 {
+  "intern_tankeprocess": "<HÄR MÅSTE DU TÄNKA HÖGT FÖRST: Analysera skämtet utifrån teorin. Vilken är jargongen? Vad är den mörkaste, mest tragiska subtexten? Hur säkerställer jag att mina förslag är realistiska och inte 'wacky' eller klyschiga?>",
   "akuten": {
-    "scenkaraktar": "<Skriv 1-2 meningar om den mörka/absurda karaktären komikern spelar.>",
-    "undertext": "<Vad är den mörka sanningen publiken måste förstå mellan raderna?>",
-    "trigger_analys": "<Analysera triggern. Om den redan ligger sist: Beröm placeringen. Om inte: Föreslå hur orden ska flyttas.>",
-    "kill_your_darlings": "<Skriv en radikalt tajtare, ordekonomisk version. DU FÅR ABSOLUT INTE BARA UPPREPA ORIGINALTEXTEN. Stryk obarmhärtigt förklarande bindningsord (som 'eftersom' eller 'vilket betyder'). Bevara eventuella citat exakt.>"
+    "scenkaraktar": "<Beskriv karaktären utan klyschor (t.ex. 'En patetisk ensamvarg').>",
+    "undertext": "<Den brutala sanningen komikern döljer.>",
+    "trigger_analys": "<Analysera ordningen. Ligger triggern sist? Beröm eller korrigera.>",
+    "kill_your_darlings": "<Skriv en tajtare version. Stryk bindningsord. Bevara ALLT direkt tal och form exakt.>"
   },
   "fordjupning": {
-    "diagnos_och_metaskamt": "<Vilken skämttyp är det? Vad är Safety och vad är Violation?>",
-    "stilistiska_extremvarden": "<Identifiera jargongen. Föreslå sedan det ABSOLUT MEST EXTREMA, kalla eller absurda ordvalet möjligt inom den jargongen för att maximera misären. Föreslå ALDRIG milda, tråkiga synonymer (som 'sökande' istället för 'kandidat'). Gå hela vägen!>",
-    "misplaced_sincerity": "<Hur ska komikerns kroppsspråk och tonfall vara för att sälja in att de inte skämtar?>",
-    "overdrift_underdrift_skala": "<Endast om skämtet bygger på orimliga proportioner, ge en 3-gradig skala. Annars skriv: 'Ej aktuellt.'>"
+    "diagnos_och_metaskamt": "<Typ av skämt (Broken assumption, etc) samt Safety/Violation.>",
+    "stilistiska_extremvarden": "<Hitta det mest iskalla, formella eller brutala ordet inom skämtets jargong. INGET TRAMS ELLER HITTEPÅ.>",
+    "misplaced_sincerity": "<Hur ska kroppsspråket dölja skämtet?>",
+    "overdrift_underdrift_skala": "<Skala 1-3 om relevant, annars 'Ej aktuellt.'>"
   },
   "skriv_katalysatorn": {
-    "pij_q1": "<Ledande fråga som utmanar komikern att byta ut ETT SPECIFIKT ORD mot något mycket mörkare, sjukare eller mer specifikt. Ge ett konkret, orimligt/roligt exempel i din fråga för att visa vägen. Inga gråa synonymer!>",
-    "pij_q2": "<Ledande fråga som utmanar komikern att testa ett perspektiv- eller statusskifte. Fråga t.ex. vad som händer med skämtet (och komikerns karaktär) om man vänder på vem som är offer och förövare, eller byter ut vem skämtet handlar om för att maxa självironin.>"
+    "pij_q1": "<Fråga komikern vad som händer om de byter ut ETT specifikt ord mot något ännu mörkare/kallare. Ge ett konkret, realistiskt exempel i frågan.>",
+    "pij_q2": "<Fråga vad som händer om man gör ett statusskifte (t.ex. byter vem som är offer/förövare).>"
   },
   "tags": ["<Tagg1>", "<Tagg2>", "<Tagg3>"]
 }`;
@@ -68,8 +71,10 @@ Du MÅSTE svara med ett giltigt JSON-objekt enligt exakt denna struktur. Ersätt
 
     const aiData = JSON.parse(response.choices[0].message.content || "{}");
 
-    // RÄTTELSE 2: Pussla ihop JSON-datan till en snygg Markdown-text för frontenden!
+    // Formatera datan för ReactMarkdown i Workshopen
     const formattedFeedback = `
+> **Doktorns inre monolog:** _${aiData.intern_tankeprocess || "Analyserar mörkret..."}_
+
 ### DEL 1: AKUTEN
 * **Scenkaraktär:** ${aiData.akuten?.scenkaraktar || ""}
 * **Undertext:** ${aiData.akuten?.undertext || ""}
@@ -89,7 +94,6 @@ Du MÅSTE svara med ett giltigt JSON-objekt enligt exakt denna struktur. Ersätt
 * **PIJ-Q 2:** ${aiData.skriv_katalysatorn?.pij_q2 || ""}
 `;
 
-    // Returnera texten ("feedback") och tagsen separat, precis som din Workshop förväntar sig
     return NextResponse.json({
       feedback: formattedFeedback,
       suggestedTags: aiData.tags || []
