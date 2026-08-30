@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
-import { comedyTheory } from "../../../lib/comedyTheory";
+
+// OBS: Om du har skapat filen comedyTheory.ts, avkommentera raden nedan:
+// import { comedyTheory } from "../../../lib/comedyTheory";
+// Annars använder vi en tom sträng så länge så att appen inte kraschar:
+const comedyTheory = ""; 
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -8,10 +12,11 @@ const openai = new OpenAI({
 
 export async function POST(req: Request) {
   try {
-    const { premise, isMetaChecked } = await req.json();
+    // RÄTTELSE 1: Vi tar emot "isMeta" (eftersom det är det som skickas från Workshopen)
+    const { premise, isMeta } = await req.json();
 
     if (!premise || premise.trim() === "") {
-      return NextResponse.json({ error: "Ingen text att analysera." }, { status: 400 });
+      return NextResponse.json({ feedback: "Ingen text att analysera.", suggestedTags: [] }, { status: 400 });
     }
 
     const masterPrompt = `Du är "Comedy Doctor 2.0", en hänsynslös men stöttande standup-redaktör inbyggd i appen Standup Studio. Ditt mål är ordekonomi, tajming och kontrast. 
@@ -20,7 +25,7 @@ Du förstår "Benign-Violation Theory" och vikten av "Undercover Comedian" (att 
 HÄR ÄR DITT TEORETISKA RAMVERK:
 ${comedyTheory}
 
-[META/ANTI-HUMOR FLAGGA: ${isMetaChecked}]
+[META/ANTI-HUMOR FLAGGA: ${isMeta ? 'true' : 'false'}]
 
 [ABSOLUTA REGLER FÖR DITT BEMÖTANDE OCH INNEHÅLL]
 1. Håll din persona: Även om du svarar i JSON, MÅSTE dina värden (texten) skrivas som om du pratar direkt, peppande och rakt till komikern. Låt inte som en robot!
@@ -63,10 +68,35 @@ Du MÅSTE svara med ett giltigt JSON-objekt enligt exakt denna struktur. Ersätt
 
     const aiData = JSON.parse(response.choices[0].message.content || "{}");
 
-    return NextResponse.json(aiData);
+    // RÄTTELSE 2: Pussla ihop JSON-datan till en snygg Markdown-text för frontenden!
+    const formattedFeedback = `
+### DEL 1: AKUTEN
+* **Scenkaraktär:** ${aiData.akuten?.scenkaraktar || ""}
+* **Undertext:** ${aiData.akuten?.undertext || ""}
+* **Trigger-analys:** ${aiData.akuten?.trigger_analys || ""}
+* **Kill Your Darlings:** ${aiData.akuten?.kill_your_darlings || ""}
+
+---
+### DEL 2: TEORETISK FÖRDJUPNING
+* **Diagnos & Metaskämtet:** ${aiData.fordjupning?.diagnos_och_metaskamt || ""}
+* **Stilistiska extremvärden:** ${aiData.fordjupning?.stilistiska_extremvarden || ""}
+* **Misplaced Sincerity:** ${aiData.fordjupning?.misplaced_sincerity || ""}
+* **Överdrift/Underdrift-Skala:** ${aiData.fordjupning?.overdrift_underdrift_skala || ""}
+
+---
+### DEL 3: SKRIV-KATALYSATORN
+* **PIJ-Q 1:** ${aiData.skriv_katalysatorn?.pij_q1 || ""}
+* **PIJ-Q 2:** ${aiData.skriv_katalysatorn?.pij_q2 || ""}
+`;
+
+    // Returnera texten ("feedback") och tagsen separat, precis som din Workshop förväntar sig
+    return NextResponse.json({
+      feedback: formattedFeedback,
+      suggestedTags: aiData.tags || []
+    });
 
   } catch (error: any) {
     console.error("Analys API error:", error);
-    return NextResponse.json({ error: "Kunde inte nå AI:n för analys." }, { status: 500 });
+    return NextResponse.json({ feedback: "Kunde inte nå AI:n för analys." }, { status: 500 });
   }
 }
