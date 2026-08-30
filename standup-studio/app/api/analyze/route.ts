@@ -80,8 +80,12 @@ Du MÅSTE svara med ett giltigt JSON-objekt enligt exakt denna struktur. Ersätt
 ---
 ### DEL 2: TEORETISK FÖRDJUPNING
 * **Diagnos & Metaskämtet:** ${aiData.fordjupning?.diagnos_och_metaskamt || ""}
-* **Stilistiska extremvärden:** ${aiData.fordjupning?.stilistiska_extremvarden || ""}
-* **Misplaced Sincerity:** ${aiData.fordjupning?.misplaced_sincerity || ""}
+"stilistiska_extremvarden": "<Identifiera jargongen. Föreslå sedan det ABSOLUT MEST EXTREMA, kalla eller absurda ordvalet möjligt inom den jargongen för att maximera misären. Föreslå ALDRIG milda, tråkiga synonymer (som 'sökande' istället för 'kandidat'). Gå hela vägen!>",
+    
+    // ... (misplaced_sincerity och skala ligger kvar som vanligt här emellan) ...
+
+    "pij_q1": "<Ledande fråga som utmanar komikern att byta ut ETT SPECIFIKT ORD mot något mycket mörkare, sjukare eller mer specifikt. Ge ett konkret, orimligt/roligt exempel i din fråga för att visa vägen. Inga gråa synonymer!>",
+    "pij_q2": "<Ledande fråga om att byta ut ett annat ORD mot något som skapar en ännu brutalare kontrast. Ge ett extremt HR-, byråkrati- eller fackspråks-exempel i frågan.>"* **Misplaced Sincerity:** ${aiData.fordjupning?.misplaced_sincerity || ""}
 * **Överdrift/Underdrift-Skala:** ${aiData.fordjupning?.overdrift_underdrift_skala || ""}
 
 ---
