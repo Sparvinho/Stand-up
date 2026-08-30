@@ -59,26 +59,35 @@ RÄTT PIJ-Q: Utmana komikern att hitta en ännu kallare HR-klyscha, t.ex. "Din p
 FEL PIJ-Q: Att föreslå tramsiga Kalle Anka-ord som "organbankir".
 FEL (Förstörd Safety): Att föreslå att byta ut "kandidater" mot "organdonatorer". Ordet "kandidater" är ju hela HR-krocken. Utan det dör parodin!
 
+[DEN KOMISKA VERKTYGSLÅDAN FÖR PIJ-FRÅGOR]
+När du formulerar PIJ-Q 2 och PIJ-Q 3, MÅSTE du välja de två verktyg från denna lista som skapar störst krock (Violation) för just detta skämt:
+1. Statusskifte: Vänd på vem som är offer/förövare (högstatus vs lågstatus) för att hitta självironi.
+2. Kontext-flytt (Analogi): Flytta skämtets logik till en helt felaktig insatsnivå (t.ex. att hantera en vardaglig konflikt med samma gravallvar som en taktisk fotbollsrotation, eller vice versa).
+3. Extrapolering: Dra premissens regel till sin absolut mest absurda, logiska extrempunkt.
+4. Reaktions-krock: Utmana komikern att visa totalt fel känsla i leveransen (t.ex. byråkratisk kyla inför något emotionellt, eller eufori inför ett avslag).
+5. Definition-Shift: Bokstavstolka eller missförstå "Safety"-ordet i premissen medvetet.
+
 [JSON-STRUKTUR OCH FÄLT-INSTRUKTIONER]
 Du MÅSTE svara med ett giltigt JSON-objekt enligt exakt denna struktur.
 
 {
-  "intern_tankeprocess": "<HÄR MÅSTE DU TÄNKA HÖGT FÖRST: Analysera skämtet utifrån teorin. Vilken är jargongen? Vad är den mörkaste, mest tragiska subtexten? Hur säkerställer jag att mina förslag är realistiska och inte 'wacky' eller klyschiga?>",
+  "intern_tankeprocess": "<HÄR MÅSTE DU TÄNKA HÖGT FÖRST: Vilken är jargongen? Vilka TVÅ verktyg från Verktygslådan skulle bända isär detta skämt mest, och varför?>",
   "akuten": {
-    "scenkaraktar": "<Beskriv karaktären utan klyschor (t.ex. 'En patetisk ensamvarg').>",
+    "scenkaraktar": "<Beskriv karaktären utan klyschor.>",
     "undertext": "<Den brutala sanningen komikern döljer.>",
-    "trigger_analys": "<Analysera ordningen. Ligger triggern sist? Beröm eller korrigera.>",
-    "kill_your_darlings": "<Skriv en tajtare version. Stryk bindningsord. Bevara ALLT direkt tal och form exakt.>"
+    "trigger_analys": "<Ligger triggern sist? Beröm eller korrigera.>",
+    "kill_your_darlings": "<Skriv en tajtare version. Stryk bindningsord. Bevara form exakt.>"
   },
   "fordjupning": {
-    "diagnos_och_metaskamt": "<Typ av skämt (Broken assumption, etc) samt Safety/Violation.>",
-    "stilistiska_extremvarden": "<Hitta det mest iskalla, formella eller brutala ordet inom skämtets jargong. INGET TRAMS ELLER HITTEPÅ.>",
+    "diagnos_och_metaskamt": "<Typ av skämt samt Safety/Violation.>",
+    "stilistiska_extremvarden": "<Det mest iskalla/brutala ordet inom jargongen. INGET TRAMS.>",
     "misplaced_sincerity": "<Hur ska kroppsspråket dölja skämtet?>",
     "overdrift_underdrift_skala": "<Skala 1-3 om relevant, annars 'Ej aktuellt.'>"
   },
   "skriv_katalysatorn": {
-    "pij_q1": "<Fråga komikern vad som händer om de byter ut ETT specifikt ord mot något ännu mörkare/kallare. Ge ett konkret, realistiskt exempel i frågan.>",
-    "pij_q2": "<Fråga vad som händer om man gör ett statusskifte (t.ex. byter vem som är offer/förövare).>"
+    "pij_q1": "<MIKROKIRURGI: Fråga om ett specifikt ORD-byte för att maxa mörkret.>",
+    "pij_q2": "<[Skriv Verktygets Namn Här] - Formulera din ledande fråga baserat på ditt första val från Verktygslådan.>",
+    "pij_q3": "<[Skriv Verktygets Namn Här] - Formulera din ledande fråga baserat på ditt andra val från Verktygslådan.>"
   },
   "tags": ["<Tagg1>", "<Tagg2>", "<Tagg3>"]
 }`;
@@ -95,25 +104,34 @@ Du MÅSTE svara med ett giltigt JSON-objekt enligt exakt denna struktur.
 
     const aiData = JSON.parse(response.choices[0].message.content || "{}");
 
-    // Formatera datan för ReactMarkdown i Workshopen
+    // Formatera datan för ReactMarkdown i Workshopen med dubbla radbrytningar
     const formattedFeedback = `
 > **Doktorns inre monolog:** _${aiData.intern_tankeprocess || "Analyserar mörkret..."}_
 
 ### DEL 1: AKUTEN
-* **Scenkaraktär:** ${aiData.akuten?.scenkaraktar || ""}
-* **Undertext:** ${aiData.akuten?.undertext || ""}
-* **Trigger-analys:** ${aiData.akuten?.trigger_analys || ""}
-* **Kill Your Darlings:** ${aiData.akuten?.kill_your_darlings || ""}
+**Scenkaraktär:** ${aiData.akuten?.scenkaraktar || ""}
+
+**Undertext:** ${aiData.akuten?.undertext || ""}
+
+**Trigger-analys:** ${aiData.akuten?.trigger_analys || ""}
+
+**Kill Your Darlings:** ${aiData.akuten?.kill_your_darlings || ""}
 
 ### DEL 2: TEORETISK FÖRDJUPNING
-* **Diagnos & Metaskämtet:** ${aiData.fordjupning?.diagnos_och_metaskamt || ""}
-* **Stilistiska extremvärden:** ${aiData.fordjupning?.stilistiska_extremvarden || ""}
-* **Misplaced Sincerity:** ${aiData.fordjupning?.misplaced_sincerity || ""}
-* **Överdrift/Underdrift-Skala:** ${aiData.fordjupning?.overdrift_underdrift_skala || ""}
+**Diagnos & Metaskämtet:** ${aiData.fordjupning?.diagnos_och_metaskamt || ""}
+
+**Stilistiska extremvärden:** ${aiData.fordjupning?.stilistiska_extremvarden || ""}
+
+**Misplaced Sincerity:** ${aiData.fordjupning?.misplaced_sincerity || ""}
+
+**Överdrift/Underdrift-Skala:** ${aiData.fordjupning?.overdrift_underdrift_skala || ""}
 
 ### DEL 3: SKRIV-KATALYSATORN
-* **PIJ-Q 1:** ${aiData.skriv_katalysatorn?.pij_q1 || ""}
-* **PIJ-Q 2:** ${aiData.skriv_katalysatorn?.pij_q2 || ""}
+**PIJ-Q 1 (Ordval):** ${aiData.skriv_katalysatorn?.pij_q1 || ""}
+
+**PIJ-Q 2 (Struktur):** ${aiData.skriv_katalysatorn?.pij_q2 || ""}
+
+**PIJ-Q 3 (Struktur):** ${aiData.skriv_katalysatorn?.pij_q3 || ""}
 `;
 
     return NextResponse.json({
