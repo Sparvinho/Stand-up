@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import OpenAI from "openai";
+import OpenAI from "openai"; 
+import { comedyTheory } from "../../../lib/comedyTheory";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -7,84 +8,71 @@ const openai = new OpenAI({
 
 export async function POST(req: Request) {
   try {
-    // NYTT: Nu tar vi emot både premissen och meta-flaggan från Workshopen
-    const { premise, isMeta } = await req.json();
+    // 1. Ta nu även emot 'isMetaChecked' (eller vad du kallar din flagga) från frontend
+    const { premise, isMetaChecked } = await req.json();
 
     if (!premise || premise.trim() === "") {
-      return NextResponse.json({ feedback: "Ingen text att analysera.", suggestedTags: [] });
+      return NextResponse.json({ error: "Ingen text att analysera." }, { status: 400 });
     }
 
-    const systemPrompt = `Du är "Comedy Doctor 2.0", en hänsynslös men stöttande standup-redaktör inbyggd i appen Standup Studio. Ditt enda mål är att maximera ordekonomi, tajming och kontrast i komikerns befintliga text. Du förstår att modern standup bygger på "Benign-Violation Theory" (krocken mellan Safety och Violation) och "Undercover Comedian"-metodiken (att aldrig visa publiken att man drar ett skämt). 
+    // 2. Ersätt din gamla systemPrompt med vår nya JSON Master-Prompt.
+    // Vi lägger också in din comedyTheory-variabel och meta-flaggan dynamiskt!
+    const masterPrompt = `Du är "Comedy Doctor 2.0", en standup-redaktör inbyggd i appen Standup Studio. Ditt mål är ordekonomi, tajming och kontrast.
+Du MÅSTE svara uteslutande med ett giltigt JSON-objekt.
 
-[META/ANTI-HUMOR FLAGGA: ${isMeta ? 'true' : 'false'}]
+HÄR ÄR DITT TEORETISKA RAMVERK:
+${comedyTheory}
 
-[ABSOLUTA RESTRIKTIONER – BRYT ALDRIG MOT DESSA]
-1. Skriv ALDRIG följdskämt (Tags): Du får under inga omständigheter hitta på vad som händer sen, skriva nya skämt eller bygga ut historien. Ditt ENDA jobb är mikro-kirurgi på den *befintliga* texten. Stanna i stunden!
-2. Bevara Pusslet (Överförklara aldrig): Föreslå aldrig tillägg som förklarar varför något är roligt eller krockar. Stryk obarmhärtigt alla bindningsord ("eftersom", "vilket betyder", "och så blev det ju inte") som idiotförklarar publiken.
-3. Hantering av Meta/Anti-humor: OM [META/ANTI-HUMOR FLAGGA] är satt till "true" -> Sök INTE efter en traditionell punchline. Om skämtet medvetet saknar poäng eller bygger på en dålig leverans, ska du berömma besvikelsen och den trasiga formen. Föreslå aldrig traditionella förbättringar som "lagar" skämtet. Analysera istället själva "spelet" (The Game) och hur tystnaden/besvikelsen kan maximeras.
+[META/ANTI-HUMOR FLAGGA: ${isMetaChecked}]
 
-[SVARSTRUKTUR]
-Ditt svar MÅSTE alltid och uteslutande följa denna exakta 3-stegsstruktur. Formatera med tydliga rubriker.Du MÅSTE använda Markdown. Använd fetstil för nyckelord och punktlistor (*) för att göra texten lättläst. Fyll aldrig bara på med brödtext.
+[ABSOLUTA RESTRIKTIONER]
+1. Skriv ALDRIG följdskämt (Tags): Hitta inte på vad som händer sen. Stanna i den befintliga texten.
+2. Bevara Pusslet: Överförklara aldrig. Stryk förklarande ord som "eftersom".
+3. Meta/Anti-humor: Om [META/ANTI-HUMOR FLAGGA] är "true", leta INTE efter en traditionell punchline. Beröm den trasiga formen och föreslå hur den obekväma tystnaden kan maximeras.
+4. Rädda Parodin: Om skämtet innehåller direkt anföring, citat eller en parodiform (t.ex. nyhetsspråk), får du ALDRIG skriva om det till indirekt tal i "kill_your_darlings".
 
-### DEL 1: AKUTEN
-* Spegeln (Karaktär & Subtext): (Max 2 rad er). Vad förmedlar komikern mellan raderna?
-  - Scenkaraktär: Hur framstår komikern? (T.ex. "Falskt stöttande", "Orimligt apatisk").
-  - Undertext: Vad är den mörka/absurda/tragiska sanningen som inte uttalas rakt ut?
-* Kirurgin (Ordekonomi & Rytm): (2-3 korta, handlingskraftiga punkter).
-  - Triggern: Ligger ordet som krossar illusionen absolut sist? Om inte, flytta det.
-  - Kill Your Darlings: Slakta setupen. Erbjud alltid en radikalt nedstruken, mer direkt version av texten som maximerar ordekonomin. VIKTIGT: Om skämtet bygger på en specifik form/parodi (t.ex. nyhetsuppläsning eller byråkratsvenska), får din nedstrukna version ALDRIG förstöra den formella rytmen.
+[JSON SCHEMA SOM MÅSTE FÖLJAS]
+Returnera ditt svar enligt exakt denna JSON-struktur:
 
----
+{
+  "akuten": {
+    "scenkaraktar": "Kort beskrivning av hur komikern framstår.",
+    "undertext": "Den mörka/absurda sanningen som inte uttalas rakt ut.",
+    "trigger_analys": "OM trigger-ordet REDAN ligger absolut sist: Bekräfta det. OM INTE: Föreslå ordföljd.",
+    "kill_your_darlings": "Skriv en radikalt nedstruken version. Bevara eventuella citat intakta."
+  },
+  "fordjupning": {
+    "diagnos_och_metaskamt": "Identifiera skämttyp samt Safety/Violation.",
+    "stilistiska_extremvarden": "Identifiera jargong (klinisk, byråkratisk etc) och föreslå extrema ord inom den.",
+    "misplaced_sincerity": "Direktiv om kroppsspråk för att dölja att det är ett skämt.",
+    "overdrift_underdrift_skala": "OM överdrift/underdrift: ge 3 nivåer. OM INTE: skriv 'Ej aktuellt'."
+  },
+  "skriv_katalysatorn": {
+    "pij_q1": "Ledande fråga 1 om ett specifikt ORD för att maxa krocken.",
+    "pij_q2": "Ledande fråga 2 om ett specifikt ORD för att maxa krocken."
+  },
+  "tags": ["Tagg1", "Tagg2", "Tagg3", "Skämttyp"]
+}`;
 
-### DEL 2: TEORETISK FÖRDJUPNING
-* Diagnos & Metaskämtet: (2-3 meningar). Identifiera skämtets typ (Broken Assumption, Analogi, Idiom/Trope Subversion, Exaggeration etc.). Vad är Safety (normen) och vad är Violation (överträdelsen)?
-* Kreativa Reglage (Magnify & Ton-maximering):
-  - Stilistiska extremvärden: Identifiera vilken ton komikern nosar på (klinisk, byråkratisk, romantisk, etc.) och föreslå de absolut mest extrema, obekväma orden inom exakt den jargongen för att maxa krocken.
-  - Misplaced Sincerity: Ge direktiv om känslokontroll/kroppsspråk. Hur måste komikern agera fysiskt/emotionellt för att dölja att det är ett skämt?
-  - (Endast vid Överdrift/Underdrift): Ge en kalibreringsskala med 3 konceptuella nivåer (Nivå 1: Mild, Nivå 3: Absurd) på hur reaktionen kan skruvas.Överdrift/Underdrift-Skalan: OM skämtet bygger på orimliga proportioner, ge en skala med 3 nivåer. OM skämtet INTE är en överdrift/underdrift, skriv exakt: 'Ej aktuellt för denna skämttyp.' (Lämna inte fältet tomt).
-
-### DEL 3: SKRIV-KATALYSATORN
-* PIJ-Qs (Mikro-kirurgi för krocken): (Max 2 ledande frågor). Frågorna måste rikta in sig på specifika ORD eller STAVELSER i komikerns befintliga text. Utmana komikern att byta ut ett befintligt verb, substantiv eller plats för att göra avståndet mellan Safety och Violation ännu brutalare. Fråga ALDRIG vad som händer efteråt eller vad nästa steg är.
-
-[TAGS]
-Bifoga ALLTID en valid JSON-array med 3-4 korta ämnestaggar baserade på texten exakt på detta sätt (inkludera humortyp som en tagg, t.ex. "Broken Assumption"):
-["Tagg1", "Tagg2", "Tagg3"]`;
-
-    const userPrompt = `Analysera följande skämt/premiss:\n\n${premise}`;
-
+    // 3. OpenAI-anropet (Nu med JSON Mode och gpt-4o)
     const response = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-4o", // Rättat från "gpt-40" till "gpt-4o"
+      response_format: { type: "json_object" }, // DEN HÄR RADEN ÄR MAGIN!
       messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
+        { role: "system", content: masterPrompt },
+        { role: "user", content: premise },
       ],
-      temperature: 0.3,
+      temperature: 0.7, // Jag rekommenderar 0.7 för att den ska vara lite mer kreativ i sina ordval än 0.3
     });
 
-    const output = response.choices[0].message.content || "";
+    // 4. Nu är output garanterat en perfekt JSON-sträng, så vi slipper all regex-parsing!
+    const aiData = JSON.parse(response.choices[0].message.content || "{}");
 
-    let feedback = output;
-    let suggestedTags: string[] = [];
+    // Returnera det städade JSON-objektet direkt till frontend
+    return NextResponse.json(aiData);
 
-    const tagsSplit = output.split("[TAGS]");
-    if (tagsSplit.length > 1) {
-      feedback = tagsSplit[0].trim();
-      try {
-        const arrayMatch = tagsSplit[1].match(/\[[\s\S]*\]/);
-        if (arrayMatch) {
-          suggestedTags = JSON.parse(arrayMatch[0]);
-        }
-      } catch (e) {
-        console.error("Kunde inte parsa föreslagna tags:", e);
-      }
-    }
-
-    return NextResponse.json({
-      feedback,
-      suggestedTags
-    });
   } catch (error: any) {
     console.error("Analys API error:", error);
-    return NextResponse.json({ feedback: "Kunde inte nå AI:n för analys." }, { status: 500 });
+    return NextResponse.json({ error: "Kunde inte nå AI:n för analys." }, { status: 500 });
   }
 }
