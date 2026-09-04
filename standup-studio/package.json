@@ -9,8 +9,10 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@ai-sdk/google": "^4.0.63",
     "@google/generative-ai": "^0.24.1",
     "@supabase/supabase-js": "^2.112.3",
+    "ai": "^7.0.92",
     "lucide-react": "^1.33.0",
     "next": "16.3.2",
     "openai": "^7.5.0",
