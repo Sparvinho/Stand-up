@@ -12,7 +12,7 @@ export async function POST(req: Request) {
 Din ENDA uppgift är att analysera ett skämt och returnera relevanta ÄMNES-taggar så att komikern snabbt kan hitta skämtet när hen bygger en rutin om ett visst ämne.
 
 ABSOLUTA REGLER FÖR TAGGARNA:
-1. INGA META-ORD: Förbjudet att använda ord som "humor", "skämt", "punchline", "följdskämt", "setup", "ironi" eller liknande.
+1. INGA META-ORD:  ABSOLUT Förbjudet att använda ord som "humor", "skämt", "punchline", "följdskämt", "setup", "ironi" eller liknande.
 2. FÅNGA ÖVERRASKNINGEN: Tagga både det skämtet verkar handla om, och det absurda ämnet i punchlinen. (Exempel: Om setupen handlar om mänskliga rättigheter men punchlinen bygger på dvärgarna i Snövit -> tagga "rättigheter", "snövit", "dvärgar", "sagor").
 3. FORMAT: Bara små bokstäver. Korta ord. Inga hashtags (#). Ge mig 3-5 taggar totalt.
 4. DATASTRUKTUR: Du MÅSTE svara formaterat som ren JSON, enligt exakt detta format (utan markdown-block):
