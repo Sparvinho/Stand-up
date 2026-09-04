@@ -1,86 +1,42 @@
-import { NextResponse } from "next/server";
-import OpenAI from "openai";
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
+import { generateText } from 'ai';
 
-// OBS: Om du har skapat filen comedyTheory.ts, avkommentera raden nedan:
-// import { comedyTheory } from "../../../lib/comedyTheory";
-// Annars använder vi en tom sträng så länge så att appen inte kraschar:
-const comedyTheory = "";
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+const google = createGoogleGenerativeAI({
+  apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY || '',
 });
 
 export async function POST(req: Request) {
-  try {
-    const { premise, isMeta } = await req.json();
+  const { premise } = await req.json();
 
-    if (!premise || premise.trim() === "") {
-      return NextResponse.json(
-        { feedback: "Ingen text att analysera.", suggestedTags: [] },
-        { status: 400 }
-      );
-    }
+  const systemPrompt = `Du är en kategoriserings-motor för en standup-komiker. 
+Din ENDA uppgift är att analysera ett skämt och returnera relevanta ÄMNES-taggar så att komikern snabbt kan hitta skämtet när hen bygger en rutin om ett visst ämne.
 
-    const masterPrompt = `Du är en tagg-motor. Returnera BARA en JSON-array med relevanta hashtags. Analysera ingenting annat.
-
-  "tags": ["<Tagg1>", "<Tagg2>", "<Tagg3>"]
+ABSOLUTA REGLER FÖR TAGGARNA:
+1. INGA META-ORD: Förbjudet att använda ord som "humor", "skämt", "punchline", "följdskämt", "setup", "ironi" eller liknande.
+2. FÅNGA ÖVERRASKNINGEN: Tagga både det skämtet verkar handla om, och det absurda ämnet i punchlinen. (Exempel: Om setupen handlar om mänskliga rättigheter men punchlinen bygger på dvärgarna i Snövit -> tagga "rättigheter", "snövit", "dvärgar", "sagor").
+3. FORMAT: Bara små bokstäver. Korta ord. Inga hashtags (#). Ge mig 3-5 taggar totalt.
+4. DATASTRUKTUR: Du MÅSTE svara formaterat som ren JSON, enligt exakt detta format (utan markdown-block):
+{
+  "suggestedTags": ["tagg1", "tagg2", "tagg3"]
 }`;
 
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o",
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: masterPrompt },
-        { role: "user", content: premise },
-      ],
-      temperature: 0.7,
+  try {
+    const result = await generateText({
+      model: google('gemini-3.1-pro-preview'),
+      system: systemPrompt,
+      prompt: `Läs och tagga detta skämt:\n\n${premise}`,
     });
 
-    const aiData = JSON.parse(response.choices[0].message.content || "{}");
+    // Tvätta bort eventuella markdown-tecken (som ```json) om AI:n ändå försöker vara övertydlig
+    const cleanText = result.text.replace(/```json/g, '').replace(/```/g, '').trim();
+    const parsedData = JSON.parse(cleanText);
 
-    // Dölj fält som AI:n lämnat tomma (t.ex. om triggern redan är perfekt eller informationsbalansen sitter)
-    const triggerText = aiData.akuten?.trigger_analys ? `**Trigger-analys:** ${aiData.akuten.trigger_analys}\n\n` : "";
-    const infoText = aiData.akuten?.informationsbalans ? `**Informationsbalans:** ${aiData.akuten.informationsbalans}\n\n` : "";
-
-    // Formatera datan för ReactMarkdown
-    const formattedFeedback = `
-### DEL 1: AKUTEN
-**Scenkaraktär:** ${aiData.akuten?.scenkaraktar || ""}
-
-**Undertext:** ${aiData.akuten?.undertext || ""}
-
-${infoText}${triggerText}**Kill Your Darlings:** ${aiData.akuten?.kill_your_darlings || ""}
-
-### DEL 2: TEORETISK FÖRDJUPNING
-**Diagnos & Metaskämtet:** ${aiData.fordjupning?.diagnos_och_metaskamt || ""}
-
-**Stilistiska extremvärden:** ${aiData.fordjupning?.stilistiska_extremvarden || ""}
-
-**Misplaced Sincerity:** ${aiData.fordjupning?.misplaced_sincerity || ""}
-
-**Överdrift/Underdrift-Skala:** ${aiData.fordjupning?.overdrift_underdrift_skala || ""}
-
-### DEL 3: SKRIV-KATALYSATORN
-**PIJ-Q 1 (Ordval):** ${aiData.skriv_katalysatorn?.pij_q1 || ""}
-
-**PIJ-Q 2 (Struktur):** ${aiData.skriv_katalysatorn?.pij_q2 || ""}
-
-**PIJ-Q 3 (Struktur):** ${aiData.skriv_katalysatorn?.pij_q3 || ""}
-
----
-> **Doktorns inre monolog:** _${aiData.intern_tankeprocess || "Analyserar mörkret..."}_
-`;
-
-    return NextResponse.json({
-      feedback: formattedFeedback,
-      suggestedTags: aiData.tags || []
+    return new Response(JSON.stringify(parsedData), {
+      headers: { 'Content-Type': 'application/json' },
     });
-
-  } catch (error: any) {
-    console.error("Analys API error:", error);
-    return NextResponse.json(
-      { feedback: "Kunde inte nå AI:n för analys." },
-      { status: 500 }
-    );
+    
+  } catch (error) {
+    console.error("Fel vid AI-taggning:", error);
+    return new Response(JSON.stringify({ suggestedTags: ["analysfel"] }), { status: 500 });
   }
 }
