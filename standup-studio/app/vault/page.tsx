@@ -284,16 +284,17 @@ export default function Library() {
                 </select>
               </div>
               <div className="flex flex-col gap-1">
-                <select value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value)} className="bg-neutral-950 border border-neutral-800 text-xs text-neutral-300 rounded px-2 py-2 outline-none cursor-pointer">
-                <option value="Alla">Alla statusar</option>
-                <option value="Klubbklar">Klubbklar</option>
-                <option value="Redo">Redo</option>
-                <option value="Testa">Testa</option>
-                <option value="Omarbeta">Omarbeta</option>
-                <option value="Råidé">Råidé</option>
-                <option value="Burned">Burned</option>
-              </select>
-              </div>
+  <label className="text-[9px] font-bold text-neutral-500 uppercase">Status</label>
+  <select value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value)} className="bg-neutral-950 border border-neutral-800 text-xs text-neutral-300 rounded px-2 py-2 outline-none cursor-pointer">
+    <option value="Alla">Alla statusar</option>
+    <option value="Klubbklar">Klubbklar</option>
+    <option value="Redo">Redo</option>
+    <option value="Testa">Testa</option>
+    <option value="Omarbeta">Omarbeta</option>
+    <option value="Råidé">Råidé</option>
+    <option value="Burned">Burned</option>
+  </select>
+</div>
               <div className="flex flex-col gap-1">
                 <label className="text-[9px] font-bold text-neutral-500 uppercase">Känsla / Mood</label>
                 <select value={selectedMood} onChange={(e) => setSelectedMood(e.target.value)} className="bg-neutral-950 border border-neutral-800 text-xs text-neutral-300 rounded px-2 py-2 outline-none cursor-pointer">
