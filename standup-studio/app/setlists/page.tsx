@@ -449,13 +449,19 @@ function SetlistsContent() {
       .map(([tag]) => tag);
   }, [allBits]);
 
-  const filteredAvailableBits = useMemo(() => {
+ const filteredAvailableBits = useMemo(() => {
+    // Dölj skämt som redan är i setlistan, och göm "Burned" såvida vi inte explicit valt det
     let list = allBits
       .filter(bit => !setlist.includes(String(bit.id)))
-      .filter(bit => bit.status !== "Pensionerad" && bit.status !== "Burned");
+      .filter(bit => bit.status !== "Pensionerad");
+      
+    if (selectedStatus !== "Burned") {
+      list = list.filter(bit => bit.status !== "Burned");
+    }
 
     switch (gigProfile) {
       case 'foretag':
+      // ... resten av koden förblir orörd!
         list = list.filter(b => (b.priority ?? 0) >= 2 && b.status !== 'Råidé' && b.status !== 'Omarbeta' && b.status !== 'Testa');
         break;
       case 'test':
@@ -860,8 +866,10 @@ function SetlistsContent() {
                       <select value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value)} className="bg-neutral-900 border border-neutral-800 rounded px-2 py-1.5 text-neutral-300 outline-none">
                         <option value="Alla">Alla statusar</option>
                         <option value="Klubbklar">Klubbklar</option>
+                        <option value= "Testa">Testa</option>
                         <option value="Redo">Redo</option>
                         <option value="Råidé">Råidé</option>
+                        <option value="Burned">Burned</option>
                         {gigProfile === 'test' && <option value="Testa">Testa</option>}
                         <option value="Omarbeta">Omarbeta</option>
                       </select>
