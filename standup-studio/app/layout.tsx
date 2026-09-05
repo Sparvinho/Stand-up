@@ -45,11 +45,7 @@ export default function RootLayout({
               <span className="text-xs md:text-sm font-medium">Bibliotek</span>
             </Link>
 
-            {/* RUTIN-BYGGAREN (Den nya vi precis skapade!) */}
-            <Link href="/rutinbyggaren" className="flex flex-col md:flex-row items-center gap-2 p-2 md:p-3 hover:bg-neutral-800 rounded-lg text-neutral-400 hover:text-white transition-colors">
-              <GitMerge size={24} />
-              <span className="text-xs md:text-sm font-medium">Rutinbyggaren</span>
-            </Link>
+         
 
             {/* SETLISTS / GIG-BYGGAREN */}
             <Link href="/setlists" className="flex flex-col md:flex-row items-center gap-2 p-2 md:p-3 hover:bg-neutral-800 rounded-lg text-neutral-400 hover:text-white transition-colors">
