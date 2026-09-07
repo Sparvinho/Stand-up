@@ -53,8 +53,9 @@ function SetlistsContent() {
   const [isPrintMode, setIsPrintMode] = useState(false);
   const [touchStart, setTouchStart] = useState({ x: 0, y: 0 });
   
-  // NYTT STATE FÖR ATT FÄLLA UT SKÄMT:
+  // Fäll ut skämt:
   const [expandedBitId, setExpandedBitId] = useState<string | null>(null);
+  const [expandedLibraryBitId, setExpandedLibraryBitId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -72,37 +73,33 @@ function SetlistsContent() {
     return () => clearInterval(interval);
   }, [isGigMode, gigPhase, isTimerRunning]);
 
-  // NY KOD: Förhindra att skärmen slocknar under gig
-useEffect(() => {
-let wakeLock: any = null;
-  
-  const requestWakeLock = async () => {
-    try {
-      // Kollar om webbläsaren stödjer funktionen (de flesta moderna mobiler gör det)
-      if ('wakeLock' in navigator) {
-        wakeLock = await navigator.wakeLock.request('screen');
-        console.log('Skärmen hålls vaken');
+  // Wake Lock för gig-mode
+  useEffect(() => {
+    let wakeLock: any = null;
+    const requestWakeLock = async () => {
+      try {
+        if ('wakeLock' in navigator) {
+          wakeLock = await navigator.wakeLock.request('screen');
+          console.log('Skärmen hålls vaken');
+        }
+      } catch (err) {
+        console.error('Kunde inte låsa skärmen:', err);
       }
-    } catch (err) {
-      console.error('Kunde inte låsa skärmen:', err);
-    }
-  };
+    };
 
-  // Aktivera bara när vi faktiskt är i Live-läget
-  if (isGigMode && gigPhase === 'live') {
-    requestWakeLock();
-  } else if (wakeLock !== null) {
-    // Släpp låset när giget är klart så batteriet inte dräneras
-    wakeLock.release().then(() => { wakeLock = null; });
-  }
-
-  // Säkerhetsåtgärd om komponenten monteras av
-  return () => {
-    if (wakeLock !== null) {
-      wakeLock.release();
+    if (isGigMode && gigPhase === 'live') {
+      requestWakeLock();
+    } else if (wakeLock !== null) {
+      wakeLock.release().then(() => { wakeLock = null; });
     }
-  };
-}, [isGigMode, gigPhase]);
+
+    return () => {
+      if (wakeLock !== null) {
+        wakeLock.release();
+      }
+    };
+  }, [isGigMode, gigPhase]);
+
   useEffect(() => {
     if (isPrintMode) {
       const timer = setTimeout(() => { window.print(); }, 500);
@@ -920,19 +917,40 @@ let wakeLock: any = null;
                 {filteredAvailableBits.map(bit => {
                   const powerScore = calculatePowerScore(bit.gig_stats);
                   const hasSwipes = bit.gig_stats && bit.gig_stats.current && (bit.gig_stats.current.guld > 0 || bit.gig_stats.current.bra > 0 || bit.gig_stats.current.bomb > 0);
+                  
                   return (
-                    <div key={bit.id} onClick={() => addBit(bit.id)} className="p-2.5 md:p-3 border border-neutral-800/80 bg-neutral-950 hover:border-purple-500/50 rounded-lg cursor-pointer flex items-center justify-between group">
-                      <div className="flex flex-col gap-1">
-                        <h4 className="text-xs font-semibold text-white flex items-center gap-2">
-                          {bit.title}
-                          {hasSwipes && (
-                            <span title="Power Ranking" className="flex items-center gap-0.5 text-[9px] font-black text-orange-400 bg-orange-500/10 px-1 rounded border border-orange-500/20">
-                              <Activity size={8} /> {powerScore.toFixed(1)}
-                            </span>
-                          )}
-                        </h4>
+                    <div 
+                      key={bit.id} 
+                      onClick={() => setExpandedLibraryBitId(expandedLibraryBitId === bit.id ? null : bit.id)} 
+                      className="p-2.5 md:p-3 border border-neutral-800/80 bg-neutral-950 hover:border-purple-500/50 rounded-lg cursor-pointer flex flex-col group transition-all"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex flex-col gap-1">
+                          <h4 className="text-xs font-semibold text-white flex items-center gap-2">
+                            {bit.title}
+                            {hasSwipes && (
+                              <span title="Power Ranking" className="flex items-center gap-0.5 text-[9px] font-black text-orange-400 bg-orange-500/10 px-1 rounded border border-orange-500/20">
+                                <Activity size={8} /> {powerScore.toFixed(1)}
+                              </span>
+                            )}
+                          </h4>
+                        </div>
+                        <button 
+                          onClick={(e) => { 
+                            e.stopPropagation(); 
+                            addBit(bit.id); 
+                          }} 
+                          className="text-neutral-600 hover:text-purple-400 bg-neutral-900 p-1.5 rounded shrink-0 transition-colors"
+                        >
+                          <Plus size={14} />
+                        </button>
                       </div>
-                      <button className="text-neutral-600 group-hover:text-purple-400 bg-neutral-900 p-1.5 rounded shrink-0"><Plus size={14} /></button>
+                      
+                      {expandedLibraryBitId === bit.id && (
+                        <div className="mt-2 pt-2 border-t border-neutral-800/60 text-xs md:text-sm text-neutral-400 leading-relaxed">
+                          {bit.premise || "Ingen text tillagd för detta skämt."}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
