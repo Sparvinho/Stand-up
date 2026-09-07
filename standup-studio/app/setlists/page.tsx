@@ -72,6 +72,37 @@ function SetlistsContent() {
     return () => clearInterval(interval);
   }, [isGigMode, gigPhase, isTimerRunning]);
 
+  // NY KOD: Förhindra att skärmen slocknar under gig
+useEffect(() => {
+let wakeLock: any = null;
+  
+  const requestWakeLock = async () => {
+    try {
+      // Kollar om webbläsaren stödjer funktionen (de flesta moderna mobiler gör det)
+      if ('wakeLock' in navigator) {
+        wakeLock = await navigator.wakeLock.request('screen');
+        console.log('Skärmen hålls vaken');
+      }
+    } catch (err) {
+      console.error('Kunde inte låsa skärmen:', err);
+    }
+  };
+
+  // Aktivera bara när vi faktiskt är i Live-läget
+  if (isGigMode && gigPhase === 'live') {
+    requestWakeLock();
+  } else if (wakeLock !== null) {
+    // Släpp låset när giget är klart så batteriet inte dräneras
+    wakeLock.release().then(() => { wakeLock = null; });
+  }
+
+  // Säkerhetsåtgärd om komponenten monteras av
+  return () => {
+    if (wakeLock !== null) {
+      wakeLock.release();
+    }
+  };
+}, [isGigMode, gigPhase]);
   useEffect(() => {
     if (isPrintMode) {
       const timer = setTimeout(() => { window.print(); }, 500);
