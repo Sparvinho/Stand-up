@@ -215,14 +215,14 @@ function WorkshopContent() {
     router.replace("/workshop");
   };
 
-  const handleAddTag = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && tagInput.trim()) {
-      e.preventDefault();
-      const newTag = tagInput.trim().toLowerCase();
-      if (!tags.includes(newTag)) { setTags([...tags, newTag]); }
-      setTagInput("");
-    }
-  };
+ const handleAddTag = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  if (e.key === 'Enter' && tagInput.trim()) {
+    e.preventDefault();
+    const newTag = tagInput.trim().toLowerCase();
+    if (!tags.includes(newTag)) { setTags([...tags, newTag]); }
+    setTagInput("");
+  }
+};
 
   const removeTag = (tagToRemove: string) => {
     setTags(tags.filter(t => t !== tagToRemove));
@@ -478,13 +478,21 @@ function WorkshopContent() {
             </span>
           ))}
           <input
-            type="text"
-            placeholder={(tags || []).length === 0 ? "Lägg till tagg..." : "+ Ny tagg..."}
-            className="bg-transparent text-xs text-neutral-400 placeholder-neutral-600 outline-none w-48 ml-1"
-            value={tagInput}
-            onChange={(e) => setTagInput(e.target.value)}
-            onKeyDown={handleAddTag}
-          />
+  type="text"
+  placeholder={(tags || []).length === 0 ? "Lägg till tagg..." : "+ Ny tagg..."}
+  className="bg-transparent text-xs text-neutral-400 placeholder-neutral-600 outline-none w-48 ml-1"
+  value={tagInput}
+  onChange={(e) => setTagInput(e.target.value)}
+  onKeyDown={handleAddTag}
+  onBlur={() => {
+    // NYTT: Sparar taggen automatiskt om du klickar utanför rutan
+    if (tagInput.trim()) {
+      const newTag = tagInput.trim().toLowerCase();
+      if (!tags.includes(newTag)) { setTags([...tags, newTag]); }
+      setTagInput("");
+    }
+  }}
+/>
           <button
             onClick={generateTags}
             disabled={isAnalyzing}

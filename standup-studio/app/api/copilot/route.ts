@@ -67,13 +67,13 @@ ${JSON.stringify(candidatePool)}
 `;
 
     const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-5.6-terra",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
       ],
       response_format: { type: "json_object" },
-      temperature: 0.7, // Lite kreativitet tillåten, speciellt för Wild Card
+      temperature: 1, // Lite kreativitet tillåten, speciellt för Wild Card
     });
 
     const parsed = JSON.parse(response.choices[0].message.content || "{}");

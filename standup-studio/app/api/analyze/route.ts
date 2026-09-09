@@ -23,13 +23,13 @@ ABSOLUTA REGLER FÖR TAGGARNA:
 4. DATASTRUKTUR: Du MÅSTE svara med ett giltigt JSON-objekt med exakt en nyckel: "suggestedTags" som innehåller en array med strängar.`;
 
     const response = await openai.chat.completions.create({
-      model: "gpt-40", // Fixat från 40 till 4o
+      model: "gpt-5.6-luna", // Fixat från 40 till 4o
       response_format: { type: "json_object" }, // Detta tvingar OpenAI att BARA svara i JSON
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: `Läs och tagga detta skämt:\n\n${premise}` },
       ],
-      temperature: 0.3, // Låg temperatur så att den inte flummar iväg
+      temperature: 1, // Låg temperatur så att den inte flummar iväg
     });
 
     const aiData = JSON.parse(response.choices[0].message.content || "{}");
