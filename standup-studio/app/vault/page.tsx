@@ -72,9 +72,12 @@ export default function Library() {
       
     if (data) {
       const safeBits = data.map(b => ({
-        ...b,
-        id: String(b.id),
-        priority: Number(b.priority) || 1,
+  ...b,
+  id: String(b.id),
+  // LÄGG TILL DENNA RAD FÖR ATT TVÄTTA TEXTEN I KORTEN:
+  premise: (b.premise || "").replace(/<[^>]*>?/gm, "").replace(/&nbsp;/g, " "),
+  priority: Number(b.priority) || 1,
+  // ... resten
         is_focused: b.is_focused || false, // SÄKERSTÄLL FOKUS DATA
         tags: Array.isArray(b.tags) ? b.tags : [],
         comedy_tags: Array.isArray(b.comedy_tags) ? b.comedy_tags : []

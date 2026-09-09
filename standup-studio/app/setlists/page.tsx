@@ -111,9 +111,12 @@ function SetlistsContent() {
     const { data: bitsData } = await supabase.from("bits").select("*").order("created_at", { ascending: false });
     if (bitsData) {
       const safeBits = bitsData.map(b => ({
-        ...b,
-        id: String(b.id),
-        priority: Number(b.priority) || 1,
+  ...b,
+  id: String(b.id),
+  // LÄGG TILL DENNA RAD FÖR ATT TVÄTTA TEXTEN ÖVERALLT I GIG-LÄGET OCH BYGGAREN:
+  premise: (b.premise || "").replace(/<[^>]*>?/gm, "").replace(/&nbsp;/g, " "),
+  priority: Number(b.priority) || 1,
+  // ... resten
         duration_seconds: b.duration_seconds !== null && b.duration_seconds !== undefined ? Number(b.duration_seconds) : 0,
         tags: Array.isArray(b.tags) ? b.tags : [],
         comedy_tags: Array.isArray(b.comedy_tags) ? b.comedy_tags : []

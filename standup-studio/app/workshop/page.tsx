@@ -74,12 +74,15 @@ function WorkshopContent() {
   const fetchBit = async (id: string) => {
     const { data, error } = await supabase.from("bits").select("*").eq("id", id).single();
     
-    if (data) {
-      setTitle(data.title || "");
-      setPremise(data.premise || "");
-      setLastSavedPremise(data.premise || "");
-      
-      let dbStatus = data.status || "Råidé";
+   if (data) {
+  setTitle(data.title || "");
+  
+  // Tvättar bort HTML-kod
+  const cleanPremise = (data.premise || "").replace(/<[^>]*>?/gm, "").replace(/&nbsp;/g, " ");
+  setPremise(cleanPremise);
+  setLastSavedPremise(cleanPremise);
+  
+  let dbStatus = data.status || "Råidé";
       if (dbStatus.toLowerCase() === 'testad') dbStatus = 'Redo';
       
       setStatus(dbStatus);
