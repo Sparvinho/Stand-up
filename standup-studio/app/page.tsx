@@ -1,20 +1,20 @@
 "use client";
-
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "../lib/supabase";
 import { useRouter } from "next/navigation";
-import { 
-  Mic, Calendar, Edit3, ArrowRight, Loader2, FileText, Zap, 
-  LayoutList, Sparkles, Lightbulb, Wand2, Square 
+import {
+  Mic, Calendar, Edit3, ArrowRight, Loader2, FileText, Zap,
+  LayoutList, Sparkles, Lightbulb, Wand2, Square, Flame
 } from "lucide-react";
 
 export default function Home() {
   const router = useRouter();
+  
   const [recentBits, setRecentBits] = useState<any[]>([]);
   const [recentSetlists, setRecentSetlists] = useState<any[]>([]);
   const [userTags, setUserTags] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  
+
   // Röstinspelning
   const [isRecording, setIsRecording] = useState(false);
   const [recordingError, setRecordingError] = useState("");
@@ -31,14 +31,17 @@ export default function Home() {
 
   const fetchDashboardData = async () => {
     setIsLoading(true);
-    // Hämtar senaste skämten och ALLA taggar för mashups
+    
+    // Hämtar alla skämt, prioriterar de som är i fokus
     const { data: bitsData } = await supabase
       .from("bits")
-      .select("id, title, format, status, tags, created_at")
+      .select("id, title, format, status, tags, created_at, is_focused")
+      .order("is_focused", { ascending: false })
       .order("created_at", { ascending: false });
-
+      
     if (bitsData) {
-      setRecentBits(bitsData.slice(0, 3)); // Visa bara topp 3 i listan
+      setRecentBits(bitsData.slice(0, 4)); // Visa topp 4 i listan
+      
       // Samla in alla unika taggar användaren någonsin använt
       const allTags = new Set<string>();
       bitsData.forEach(bit => {
@@ -52,8 +55,9 @@ export default function Home() {
       .select("id, title, created_at, bit_ids")
       .order("created_at", { ascending: false })
       .limit(2);
-
+      
     if (setsData) setRecentSetlists(setsData);
+    
     setIsLoading(false);
   };
 
@@ -61,10 +65,10 @@ export default function Home() {
   const generateIdea = () => {
     const moods = ["Trött", "Deppig", "Arrogant", "Spelat oskuldsfull", "Sarkastisk", "Upprörd", "Retstickig"];
     const topics = ["Självscanning på Ica", "Gruppchattar", "Att köpa gymkort", "Föräldramöten", "Folk som pratar i högtalartelefon på bussen", "Att montera IKEA-möbler", "Första dejten", "Skapa ett nytt lösenord", "Vakna innan väckarklockan", "Svensk sommar", "Kundtjänst", "Att gå på husvisning", "Mellandagsrea"];
-
+    
     // 50% chans för Mashup (om du har minst 2 taggar), annars Persona-krock
     const useMashup = Math.random() > 0.5 && userTags.length >= 2;
-
+    
     if (useMashup) {
       const tag1 = userTags[Math.floor(Math.random() * userTags.length)];
       let tag2 = userTags[Math.floor(Math.random() * userTags.length)];
@@ -84,7 +88,7 @@ export default function Home() {
     if (!creativePrompt) return;
     setIsGeneratingBit(true);
     const title = creativeMood ? `Ny idé (${creativeMood})` : "Ny idé (Tag-Mashup)";
-
+    
     const { data, error } = await supabase
       .from("bits")
       .insert([{
@@ -139,12 +143,13 @@ export default function Home() {
     recognition.onresult = async (event: any) => {
       setIsRecording(false);
       const transcript = event.results[0][0].transcript;
+      
       if (transcript) {
-        const { data, error } = await supabase.from("bits").insert([{ 
+        const { data, error } = await supabase.from("bits").insert([{
           title: "Röstanteckning",
-          premise: transcript, 
-          status: "Råidé", 
-          format: "oneliner", 
+          premise: transcript,
+          status: "Råidé",
+          format: "oneliner",
           priority: 1
         }]).select().single();
         
@@ -170,6 +175,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-neutral-950 text-white p-4 md:p-10 pb-32">
       <div className="max-w-5xl mx-auto">
+        
         {/* HEADER */}
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-3xl md:text-4xl font-black text-white tracking-tight">Standup Studio</h1>
@@ -200,7 +206,6 @@ export default function Home() {
             </>
           )}
         </button>
-
         {recordingError && <p className="text-red-400 text-center text-sm mt-2 mb-6">{recordingError}</p>}
 
         {/* --- KREATIVA MOTORN --- */}
@@ -217,20 +222,20 @@ export default function Home() {
             ) : null}
 
             <div className="flex flex-wrap items-center gap-3">
-              <button
+              <button 
                 onClick={generateIdea}
                 className="bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-lg flex items-center gap-2"
               >
                 <Wand2 size={18} /> {creativePrompt ? "Ge mig en annan vinkel" : "Ge mig en utmaning!"}
               </button>
-
+              
               {creativePrompt && (
-                <button
+                <button 
                   onClick={createBitFromPrompt}
                   disabled={isGeneratingBit}
                   className="bg-neutral-900 border border-neutral-700 hover:bg-neutral-800 text-white font-bold py-3 px-6 rounded-xl transition-all flex items-center gap-2"
                 >
-                  {isGeneratingBit ? <Loader2 size={18} className="animate-spin" /> : <Edit3 size={18} />}
+                  {isGeneratingBit ? <Loader2 size={18} className="animate-spin" /> : <Edit3 size={18}/>}
                   Skapa skämt av detta
                 </button>
               )}
@@ -264,7 +269,9 @@ export default function Home() {
 
           <div className="bg-neutral-900/50 border border-neutral-800 rounded-2xl p-6 flex flex-col">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-sm font-bold text-neutral-300 flex items-center gap-2"><Edit3 size={16} className="text-purple-500" /> Senaste idéer i Workshop</h3>
+              <h3 className="text-sm font-bold text-neutral-300 flex items-center gap-2">
+                <Flame size={16} className="text-yellow-500" /> Arbetsbänken
+              </h3>
               <button onClick={() => router.push('/vault')} className="text-xs font-bold text-neutral-500 hover:text-white transition-colors">Visa bibliotek</button>
             </div>
             <div className="flex flex-col gap-3">
@@ -275,7 +282,10 @@ export default function Home() {
                   <div key={bit.id} onClick={() => router.push(`/workshop?id=${bit.id}`)} className="bg-neutral-950 border border-neutral-800 p-4 rounded-xl cursor-pointer hover:border-neutral-600 transition-colors flex items-center justify-between group">
                     <div className="flex items-center gap-3">
                       {bit.format === 'oneliner' ? <Zap size={16} className="text-yellow-500"/> : <FileText size={16} className="text-blue-500"/>}
-                      <h4 className="font-bold text-white text-sm group-hover:text-purple-400 transition-colors">{bit.title || "Namnlös idé"}</h4>
+                      <h4 className="font-bold text-white text-sm group-hover:text-purple-400 transition-colors flex items-center gap-2">
+                        {bit.title || "Namnlös idé"}
+                        {bit.is_focused && <Flame size={14} className="text-yellow-500 shrink-0" fill="currentColor" />}
+                      </h4>
                     </div>
                     <span className="text-[10px] uppercase font-bold tracking-wider text-neutral-500">{bit.status}</span>
                   </div>
@@ -284,6 +294,7 @@ export default function Home() {
             </div>
           </div>
         </div>
+        
       </div>
     </div>
   );

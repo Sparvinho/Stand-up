@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   Sparkles, Save, Check, Plus, Tag as TagIcon, Loader2,
   X, CornerDownRight, Star, ShieldAlert,
-  Layers, Smile, AlignLeft, Clock, History, Activity, RotateCcw, Trash2, ArrowLeft, Brain
+  Layers, Smile, AlignLeft, Clock, History, Activity, RotateCcw, Trash2, ArrowLeft, Brain, Flame
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 
@@ -28,6 +28,7 @@ function WorkshopContent() {
   const [format, setFormat] = useState("observation");
   const [durationSeconds, setDurationSeconds] = useState<number>(20);
   const [isMeta, setIsMeta] = useState<boolean>(false);
+  const [isFocused, setIsFocused] = useState<boolean>(false); // NY STATE FÖR FOKUS
   
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
@@ -35,6 +36,7 @@ function WorkshopContent() {
   const [history, setHistory] = useState<{ date: string, text: string }[]>([]);
   const [lastSavedPremise, setLastSavedPremise] = useState("");
   const [showHistory, setShowHistory] = useState(false);
+  
   const [gigStats, setGigStats] = useState<any>({
     current: { guld: 0, bra: 0, bomb: 0 },
     historical: { guld: 0, bra: 0, bomb: 0 }
@@ -88,6 +90,7 @@ function WorkshopContent() {
       setFormat(data.format || "observation");
       setDurationSeconds(data.duration_seconds !== null ? Number(data.duration_seconds) : 20);
       setIsMeta(data.is_meta || false);
+      setIsFocused(data.is_focused || false); // HÄMTA FOKUS FRÅN DATABASEN
       setTags(Array.isArray(data.tags) ? data.tags : []);
       setComedyTags(Array.isArray(data.comedy_tags) ? data.comedy_tags : []);
       setHistory(Array.isArray(data.history) ? data.history : []);
@@ -108,7 +111,7 @@ function WorkshopContent() {
     const payload = {
       title, premise, status, priority, mood, role,
       risk_level: riskLevel, format, duration_seconds: durationSeconds,
-      is_meta: isMeta,
+      is_meta: isMeta, is_focused: isFocused, // SPARA FOKUS I DATABASEN
       tags: tags || [], comedy_tags: comedyTags || [], history: updatedHistory,
       gig_stats: gigStats
     };
@@ -189,6 +192,7 @@ function WorkshopContent() {
     setFormat("observation");
     setDurationSeconds(20);
     setIsMeta(false);
+    setIsFocused(false);
     setTags([]);
     setComedyTags([]);
     setHistory([]);
@@ -202,6 +206,7 @@ function WorkshopContent() {
     setActiveId(null);
     setTitle(title ? title + " - kopia" : "Ny kopia");
     setSaved(false);
+    setIsFocused(false);
     setHistory([]);
     setGigStats({ current: { guld: 0, bra: 0, bomb: 0 }, historical: { guld: 0, bra: 0, bomb: 0 } });
     router.replace("/workshop");
@@ -233,24 +238,21 @@ function WorkshopContent() {
   };
 
   const generateTags = async () => {
-    if (!premise || premise.length < 10) { 
-      alert("Skriv lite mer premiss först!"); 
-      return; 
+    if (!premise || premise.length < 10) {
+      alert("Skriv lite mer premiss först!");
+      return;
     }
-    
     setIsAnalyzing(true);
     try {
       const res = await fetch("/api/analyze", {
-        method: "POST", 
+        method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           premise: premise + "\n\nFöljdskämt:\n" + comedyTags.join("\n"),
           isMeta: isMeta
         }),
       });
-      
       const data = await res.json();
-      
       if (data.suggestedTags && Array.isArray(data.suggestedTags)) {
         setTags(prevTags => {
           const updatedTags = [...prevTags];
@@ -261,8 +263,8 @@ function WorkshopContent() {
           return updatedTags;
         });
       }
-    } catch (error) { 
-      console.error("Analysis error:", error); 
+    } catch (error) {
+      console.error("Analysis error:", error);
     }
     setIsAnalyzing(false);
   };
@@ -270,7 +272,6 @@ function WorkshopContent() {
   return (
     <div className="h-full flex flex-col bg-neutral-950 text-white">
       <div className="flex-1 p-6 md:p-10 flex flex-col relative h-full overflow-y-auto">
-        
         {/* Tillbakaknapp */}
         <div className="mb-6 flex items-center justify-between">
           <button
@@ -313,9 +314,20 @@ function WorkshopContent() {
                 </button>
               </>
             )}
+            
             <button onClick={handleDuplicate} className="hidden md:flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-medium text-neutral-400 hover:text-white hover:bg-neutral-900 border border-neutral-800 transition-all">
               <Plus size={14} /> Ny kopia
             </button>
+
+            {/* FOKUS-KNAPPEN */}
+            <button
+              onClick={() => setIsFocused(!isFocused)}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all ${isFocused ? 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/30' : 'bg-transparent text-neutral-500 hover:text-yellow-500 border border-neutral-800'}`}
+            >
+              <Flame size={14} fill={isFocused ? "currentColor" : "none"} />
+              <span className="hidden md:inline">{isFocused ? 'I Fokus' : 'Fokusera'}</span>
+            </button>
+
             <button
               ref={saveButtonRef}
               onClick={handleSave} disabled={isSaving || !title}
@@ -340,7 +352,7 @@ function WorkshopContent() {
               <option value="Burned">Burned</option>
             </select>
           </div>
-          
+
           <div className="flex flex-col gap-1">
             <label className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider flex items-center gap-1"><Star size={10} className="text-yellow-500" /> Betyg</label>
             <div className="flex items-center bg-neutral-950 border border-neutral-800 rounded px-2 py-1 justify-between">
@@ -349,7 +361,7 @@ function WorkshopContent() {
               ))}
             </div>
           </div>
-          
+
           <div className="flex flex-col gap-1">
             <label className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider flex items-center gap-1"><Clock size={10} className="text-purple-400" /> Speltid</label>
             <div className="flex items-center bg-neutral-950 border border-neutral-800 rounded px-1.5 py-1 justify-center gap-0.5">
@@ -359,7 +371,7 @@ function WorkshopContent() {
               <span className="text-[10px] text-neutral-500">s</span>
             </div>
           </div>
-          
+
           <div className="flex flex-col gap-1">
             <label className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider flex items-center gap-1"><Smile size={10} /> Mood</label>
             <select value={mood} onChange={(e) => setMood(e.target.value)} className="bg-neutral-950 border border-neutral-800 text-xs font-semibold text-neutral-300 rounded px-2 py-1 outline-none cursor-pointer">
@@ -374,7 +386,7 @@ function WorkshopContent() {
               <option value="Retstickig">Retstickig</option>
             </select>
           </div>
-          
+
           <div className="flex flex-col gap-1">
             <label className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider flex items-center gap-1"><Layers size={10} /> Roll</label>
             <select value={role} onChange={(e) => setRole(e.target.value)} className="bg-neutral-950 border border-neutral-800 text-xs font-semibold text-neutral-300 rounded px-2 py-1 outline-none cursor-pointer">
@@ -386,7 +398,7 @@ function WorkshopContent() {
               <option value="Nyhetsskämt">Nyhetsskämt</option>
             </select>
           </div>
-          
+
           <div className="flex flex-col gap-1">
             <label className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider flex items-center gap-1"><ShieldAlert size={10} /> Risknivå</label>
             <select value={riskLevel} onChange={(e) => setRiskLevel(e.target.value)} className="bg-neutral-950 border border-neutral-800 text-xs font-semibold text-neutral-300 rounded px-2 py-1 outline-none cursor-pointer">
@@ -395,7 +407,7 @@ function WorkshopContent() {
               <option value="Mörkt">Late Night / Mörkt</option>
             </select>
           </div>
-          
+
           <div className="flex flex-col gap-1">
             <label className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider flex items-center gap-1"><AlignLeft size={10} /> Format</label>
             <select value={format} onChange={(e) => setFormat(e.target.value)} className="bg-neutral-950 border border-neutral-800 text-xs font-semibold text-neutral-300 rounded px-2 py-1 outline-none cursor-pointer">
@@ -404,7 +416,7 @@ function WorkshopContent() {
               <option value="story">Lång Story</option>
             </select>
           </div>
-          
+
           <div className="flex flex-col gap-1 justify-center pl-2 border-l border-neutral-800/50">
             <label className="text-[10px] font-bold text-neutral-400 hover:text-white transition-colors flex items-center gap-1.5 cursor-pointer h-full">
               <input
@@ -429,6 +441,7 @@ function WorkshopContent() {
                   <Activity size={18} /> {calculatePowerScore(gigStats).toFixed(1)} <span className="text-xs text-neutral-600 font-medium">({calculateHistoricalPowerScore(gigStats).toFixed(1)})</span>
                 </div>
               </div>
+              
               <div className="flex gap-4 border-l border-neutral-800 pl-6">
                 <div className="text-center">
                   <span className="text-[9px] font-bold text-yellow-500 uppercase block">Guld</span>
@@ -444,6 +457,7 @@ function WorkshopContent() {
                 </div>
               </div>
             </div>
+
             {(gigStats.current?.guld > 0 || gigStats.current?.bra > 0 || gigStats.current?.bomb > 0) && (
               <button onClick={handleResetStats} className="flex items-center gap-1.5 text-[10px] font-bold text-neutral-400 hover:text-red-400 transition-colors bg-neutral-950 px-2.5 py-1.5 rounded border border-neutral-800 hover:border-red-900/50">
                 <RotateCcw size={12} /> Nollställ ny statistik
@@ -460,18 +474,17 @@ function WorkshopContent() {
               <button onClick={() => removeTag(tag)} className="text-neutral-500 hover:text-red-400 transition-colors ml-1"><X size={12} /></button>
             </span>
           ))}
-          <input 
-            type="text" 
-            placeholder={(tags || []).length === 0 ? "Lägg till tagg..." : "+ Ny tagg..."} 
-            className="bg-transparent text-xs text-neutral-400 placeholder-neutral-600 outline-none w-48 ml-1" 
-            value={tagInput} 
+          <input
+            type="text"
+            placeholder={(tags || []).length === 0 ? "Lägg till tagg..." : "+ Ny tagg..."}
+            className="bg-transparent text-xs text-neutral-400 placeholder-neutral-600 outline-none w-48 ml-1"
+            value={tagInput}
             onChange={(e) => setTagInput(e.target.value)}
-            onKeyDown={handleAddTag} 
+            onKeyDown={handleAddTag}
           />
-          
-          <button 
-            onClick={generateTags} 
-            disabled={isAnalyzing} 
+          <button
+            onClick={generateTags}
+            disabled={isAnalyzing}
             className="ml-auto flex items-center gap-1.5 px-3 py-1.5 bg-blue-600/10 text-blue-400 hover:bg-blue-600 hover:text-white border border-blue-500/30 rounded-lg text-xs font-semibold transition-all disabled:opacity-50"
           >
             {isAnalyzing ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
@@ -490,7 +503,7 @@ function WorkshopContent() {
         <div className="shrink-0 border-t border-neutral-800/60 pt-6">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-xs font-bold text-neutral-500 uppercase tracking-wider flex items-center gap-2">
-              <CornerDownRight size={14} /> Följdskämt/Punchlines / Tags
+              <CornerDownRight size={14} /> Följdskämt / Punchlines / Tags
             </h3>
           </div>
           <div className="space-y-2.5 mb-3">
@@ -551,7 +564,7 @@ function WorkshopContent() {
 
 export default function Workshop() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-neutral-950 flex justify-center p-20"><Loader2 className="animate-spin text-blue-500" size={32}/></div>}>
+    <Suspense fallback={<div className="min-h-screen bg-neutral-950 flex justify-center p-20"><Loader2 className="animate-spin text-blue-500" size={32} /></div>}>
       <WorkshopContent />
     </Suspense>
   );

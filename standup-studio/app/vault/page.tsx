@@ -1,9 +1,8 @@
 "use client";
-
 import { useState, useEffect, useMemo } from "react";
-import { 
-  FolderOpen, Search, Mic, Briefcase, Edit3, Film, X, 
-  ArrowUpDown, Filter, Hash, Plus, ArrowRight, Loader2, Activity, Trash2, Eraser
+import {
+  FolderOpen, Search, Mic, Briefcase, Edit3, Film, X,
+  ArrowUpDown, Filter, Hash, Plus, ArrowRight, Loader2, Activity, Trash2, Eraser, Flame
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { useRouter } from "next/navigation";
@@ -14,7 +13,7 @@ export default function Library() {
   const [allBits, setAllBits] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isFiltersLoaded, setIsFiltersLoaded] = useState(false);
-  
+
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("Alla");
   const [gigProfile, setGigProfile] = useState<string>("ingen");
@@ -25,7 +24,9 @@ export default function Library() {
   const [selectedFormat, setSelectedFormat] = useState("Alla");
   const [selectedMood, setSelectedMood] = useState("Alla");
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [showFocusedOnly, setShowFocusedOnly] = useState(false); // NY STATE FÖR FOKUS
 
   // 1. Ladda filter från LocalStorage vid start
   useEffect(() => {
@@ -43,6 +44,7 @@ export default function Library() {
         if (parsed.selectedMood) setSelectedMood(parsed.selectedMood);
         if (parsed.selectedTag) setSelectedTag(parsed.selectedTag);
         if (parsed.showAdvancedFilters !== undefined) setShowAdvancedFilters(parsed.showAdvancedFilters);
+        if (parsed.showFocusedOnly !== undefined) setShowFocusedOnly(parsed.showFocusedOnly);
       } catch (e) {
         console.error("Kunde inte läsa sparade filter", e);
       }
@@ -55,11 +57,11 @@ export default function Library() {
   useEffect(() => {
     if (!isFiltersLoaded) return;
     const filtersToSave = {
-      selectedStatus, gigProfile, minPriority, sortBy, selectedRole, 
-      selectedRisk, selectedFormat, selectedMood, selectedTag, showAdvancedFilters
+      selectedStatus, gigProfile, minPriority, sortBy, selectedRole,
+      selectedRisk, selectedFormat, selectedMood, selectedTag, showAdvancedFilters, showFocusedOnly
     };
     localStorage.setItem("vaultFilters", JSON.stringify(filtersToSave));
-  }, [selectedStatus, gigProfile, minPriority, sortBy, selectedRole, selectedRisk, selectedFormat, selectedMood, selectedTag, showAdvancedFilters, isFiltersLoaded]);
+  }, [selectedStatus, gigProfile, minPriority, sortBy, selectedRole, selectedRisk, selectedFormat, selectedMood, selectedTag, showAdvancedFilters, showFocusedOnly, isFiltersLoaded]);
 
   const fetchBits = async () => {
     setIsLoading(true);
@@ -73,6 +75,7 @@ export default function Library() {
         ...b,
         id: String(b.id),
         priority: Number(b.priority) || 1,
+        is_focused: b.is_focused || false, // SÄKERSTÄLL FOKUS DATA
         tags: Array.isArray(b.tags) ? b.tags : [],
         comedy_tags: Array.isArray(b.comedy_tags) ? b.comedy_tags : []
       }));
@@ -116,7 +119,7 @@ export default function Library() {
   };
 
   const activeFilterCount = 
-    (gigProfile !== "ingen" ? 1 : 0) +
+    (gigProfile !== "ingen" ? 1 : 0) + 
     (minPriority > 0 ? 1 : 0) +
     (selectedStatus !== "Alla" ? 1 : 0) +
     (selectedRole !== "Alla" ? 1 : 0) +
@@ -159,14 +162,19 @@ export default function Library() {
 
   const filteredBits = useMemo(() => {
     let list = allBits.filter(bit => bit.status !== "Pensionerad" && bit.status !== "Burned");
-    
+
+    // FOKUS-LOGIK
+    if (showFocusedOnly) {
+      list = list.filter(bit => bit.is_focused === true);
+    }
+
     switch (gigProfile) {
       case 'foretag': list = list.filter(b => (b.priority ?? 0) >= 2 && b.status !== 'Råidé' && b.status !== 'Omarbeta' && b.status !== 'Testa'); break;
       case 'test': list = list.filter(b => b.status === 'Råidé' || b.status === 'Omarbeta' || b.status === 'Testa'); break;
       case 'special': list = list.filter(b => b.priority === 3); break;
       case 'klubb': case 'ingen': default: break;
     }
-    
+
     if (minPriority > 0) list = list.filter(bit => (bit.priority || 1) >= minPriority);
     
     if (selectedStatus !== "Alla") {
@@ -204,11 +212,10 @@ export default function Library() {
     });
 
     return list;
-  }, [allBits, searchQuery, selectedStatus, gigProfile, minPriority, sortBy, selectedRole, selectedRisk, selectedFormat, selectedMood, selectedTag]);
+  }, [allBits, searchQuery, selectedStatus, gigProfile, minPriority, sortBy, selectedRole, selectedRisk, selectedFormat, selectedMood, selectedTag, showFocusedOnly]);
 
   return (
     <div className="h-full flex flex-col bg-neutral-950 p-6 md:p-10 overflow-hidden text-white">
-      
       {/* Header */}
       <div className="flex justify-between items-center mb-6 shrink-0">
         <div>
@@ -225,14 +232,15 @@ export default function Library() {
       {/* Filtersektion */}
       <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-4 mb-6 shrink-0">
         <div className="flex gap-3 items-center w-full">
+          
           <div className="relative flex-1">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
-            <input 
-              type="text" 
-              placeholder="Sök bland skämt (titel, text, tags)..." 
-              value={searchQuery} 
-              onChange={(e) => setSearchQuery(e.target.value)} 
-              className="w-full bg-neutral-950 border border-neutral-800 rounded-lg pl-9 pr-8 py-2.5 text-sm text-white placeholder-neutral-500 outline-none focus:border-blue-500/50" 
+            <input
+              type="text"
+              placeholder="Sök bland skämt (titel, text, tags)..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-neutral-950 border border-neutral-800 rounded-lg pl-9 pr-8 py-2.5 text-sm text-white placeholder-neutral-500 outline-none focus:border-blue-500/50"
             />
             {searchQuery && (
               <button onClick={() => setSearchQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-white">
@@ -240,16 +248,27 @@ export default function Library() {
               </button>
             )}
           </div>
-          <button 
-            onClick={() => setShowAdvancedFilters(!showAdvancedFilters)} 
+          
+          {/* FOKUS-KNAPPEN BREDVID FILTER */}
+          <button
+            onClick={() => setShowFocusedOnly(!showFocusedOnly)}
+            className={`flex items-center gap-2 text-sm font-medium px-4 py-2.5 rounded-lg border transition-colors shrink-0 ${showFocusedOnly ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-500' : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-white'}`}
+          >
+            <Flame size={16} fill={showFocusedOnly ? "currentColor" : "none"} />
+            <span className="hidden sm:inline">Fokus</span>
+          </button>
+
+          <button
+            onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
             className={`flex items-center gap-2 text-sm font-medium px-4 py-2.5 rounded-lg border transition-colors shrink-0 ${
               showAdvancedFilters || activeFilterCount > 0 ? 'bg-blue-600/20 border-blue-500/50 text-blue-400' : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-white'
             }`}
           >
-            <Filter size={16} /> 
+            <Filter size={16} />
             <span className="hidden sm:inline">Filter</span>
             {activeFilterCount > 0 && <span className="bg-blue-600 text-white text-[10px] px-1.5 py-0.5 rounded-full">{activeFilterCount}</span>}
           </button>
+
         </div>
 
         {/* Infällbar Meny */}
@@ -259,11 +278,11 @@ export default function Library() {
               <span className="text-xs font-bold text-neutral-400 uppercase tracking-widest">Klassificeringar</span>
               {activeFilterCount > 0 && (
                 <button onClick={clearFilters} className="text-xs font-medium text-red-400 hover:text-red-300 flex items-center gap-1.5 transition-colors">
-                  <Eraser size={14}/> Töm alla filter
+                  <Eraser size={14} /> Töm alla filter
                 </button>
               )}
             </div>
-
+            
             <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3 mb-4">
               <div className="flex flex-col gap-1">
                 <label className="text-[9px] font-bold text-neutral-500 uppercase">Sortering</label>
@@ -278,23 +297,23 @@ export default function Library() {
                 <label className="text-[9px] font-bold text-neutral-500 uppercase">Betyg</label>
                 <select value={minPriority} onChange={(e) => setMinPriority(Number(e.target.value))} className="bg-neutral-950 border border-neutral-800 text-xs text-neutral-300 rounded px-2 py-2 outline-none cursor-pointer">
                   <option value={0}>Alla betyg</option>
-                  <option value={1}>★ 1+</option>
-                  <option value={2}>★★ 2+</option>
-                  <option value={3}>★★★ 3</option>
+                  <option value={1}>1+</option>
+                  <option value={2}>2+</option>
+                  <option value={3}>3</option>
                 </select>
               </div>
               <div className="flex flex-col gap-1">
-  <label className="text-[9px] font-bold text-neutral-500 uppercase">Status</label>
-  <select value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value)} className="bg-neutral-950 border border-neutral-800 text-xs text-neutral-300 rounded px-2 py-2 outline-none cursor-pointer">
-    <option value="Alla">Alla statusar</option>
-    <option value="Klubbklar">Klubbklar</option>
-    <option value="Redo">Redo</option>
-    <option value="Testa">Testa</option>
-    <option value="Omarbeta">Omarbeta</option>
-    <option value="Råidé">Råidé</option>
-    <option value="Burned">Burned</option>
-  </select>
-</div>
+                <label className="text-[9px] font-bold text-neutral-500 uppercase">Status</label>
+                <select value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value)} className="bg-neutral-950 border border-neutral-800 text-xs text-neutral-300 rounded px-2 py-2 outline-none cursor-pointer">
+                  <option value="Alla">Alla statusar</option>
+                  <option value="Klubbklar">Klubbklar</option>
+                  <option value="Redo">Redo</option>
+                  <option value="Testa">Testa</option>
+                  <option value="Omarbeta">Omarbeta</option>
+                  <option value="Råidé">Råidé</option>
+                  <option value="Burned">Burned</option>
+                </select>
+              </div>
               <div className="flex flex-col gap-1">
                 <label className="text-[9px] font-bold text-neutral-500 uppercase">Känsla / Mood</label>
                 <select value={selectedMood} onChange={(e) => setSelectedMood(e.target.value)} className="bg-neutral-950 border border-neutral-800 text-xs text-neutral-300 rounded px-2 py-2 outline-none cursor-pointer">
@@ -351,7 +370,7 @@ export default function Library() {
                   <button onClick={() => handleProfileChange('special')} className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${gigProfile === 'special' ? 'bg-purple-600 text-white' : 'bg-neutral-950 text-neutral-400 hover:text-white border border-neutral-800'}`}><Film size={12}/> Special</button>
                 </div>
               </div>
-
+              
               {topTags.length > 0 && (
                 <div className="md:border-l md:border-neutral-800 md:pl-6">
                   <label className="text-[9px] font-bold text-neutral-500 uppercase tracking-widest block mb-2 flex items-center gap-1"><Hash size={12}/> Populära tags</label>
@@ -387,7 +406,10 @@ export default function Library() {
                 <div key={bit.id} onClick={() => router.push(`/workshop?id=${bit.id}`)} className={`p-4 bg-neutral-900 border ${mood.border} hover:border-blue-500/50 rounded-xl cursor-pointer transition-all flex flex-col justify-between group shadow-sm`}>
                   <div>
                     <div className="flex items-start justify-between gap-2 mb-1.5">
-                      <h3 className="font-bold text-white text-base group-hover:text-blue-400 transition-colors truncate">{bit.title || "Namnlös"}</h3>
+                      <h3 className="font-bold text-white text-base group-hover:text-blue-400 transition-colors truncate flex items-center gap-2">
+                        {bit.title || "Namnlös"}
+                        {bit.is_focused && <Flame size={14} className="text-yellow-500 shrink-0" fill="currentColor" />}
+                      </h3>
                       <div className="flex items-center gap-1.5 shrink-0 mt-1">
                         {totalSwipes > 0 && (
                           <div title="Power Ranking" className="flex items-center gap-1 text-[10px] font-black text-orange-400 bg-orange-500/10 px-1.5 py-0.5 rounded border border-orange-500/20 mr-1">
@@ -401,6 +423,7 @@ export default function Library() {
                     </div>
                     <p className="text-neutral-400 text-xs line-clamp-2 mb-3">{bit.premise || "Ingen text"}</p>
                   </div>
+                  
                   <div className="flex items-center justify-between pt-2 border-t border-neutral-800/80 mt-auto">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       {bit.mood && <span className={`text-[9px] font-bold px-2 py-0.5 rounded border uppercase tracking-wider ${mood.badge}`}>{bit.mood}</span>}
