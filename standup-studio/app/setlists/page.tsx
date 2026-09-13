@@ -470,8 +470,12 @@ function SetlistsContent() {
       .filter(bit => bit.status !== "Pensionerad");
       
     if (selectedStatus !== "Burned") {
-      list = list.filter(bit => bit.status !== "Burned");
-    }
+  list = list.filter(bit => bit.status !== "Burned");
+}
+// <-- NY: Göm Källaren by default om vi inte uttryckligen valt "Källaren" i filtret
+if (selectedStatus !== "Källaren") {
+  list = list.filter(bit => bit.status !== "Källaren");
+}
     
     switch (gigProfile) {
       case 'foretag':
@@ -852,15 +856,15 @@ function SetlistsContent() {
                         <option value={3}>★★★3</option>
                       </select>
                       <select value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value)} className="bg-neutral-900 border border-neutral-800 rounded px-2 py-1.5 text-neutral-300 outline-none">
-                        <option value="Alla">Alla statusar</option>
-                        <option value="Klubbklar">Klubbklar</option>
-                        <option value="Testa">Testa</option>
-                        <option value="Redo">Redo</option>
-                        <option value="Råidé">Råidé</option>
-                        <option value="Burned">Burned</option>
-                        {gigProfile === 'test' && <option value="Testa">Testa</option>}
-                        <option value="Omarbeta">Omarbeta</option>
-                      </select>
+  <option value="Alla">Alla statusar</option>
+  <option value="Klubbklar">Klubbklar</option>
+  <option value="Testa">Testa</option>
+  <option value="Redo">Redo</option>
+  <option value="Råidé">Råidé</option>
+  <option value="Omarbeta">Omarbeta</option>
+  <option value="Burned">Burned</option>
+  <option value="Källaren">Källaren</option> {/* <-- NY */}
+</select>
                       <select value={selectedMood} onChange={(e) => setSelectedMood(e.target.value)} className="bg-neutral-900 border border-neutral-800 rounded px-2 py-1.5 text-neutral-300 outline-none">
                         <option value="Alla">Alla känslor</option>
                         <option value="Avmätt">Avmätt</option>
@@ -874,12 +878,15 @@ function SetlistsContent() {
                         <option value="Retstickig">Retstickig</option>
                       </select>
                       <select value={selectedRole} onChange={(e) => setSelectedRole(e.target.value)} className="bg-neutral-900 border border-neutral-800 rounded px-2 py-1.5 text-neutral-300 outline-none">
-                        <option value="Alla">Alla roller</option>
-                        <option value="Öppnare">Öppnare</option>
-                        <option value="Story">Mellanbit / Story</option>
-                        <option value="Callback">Callback</option>
-                        <option value="Stängare">Stängare</option>
-                      </select>
+  <option value="Alla">Alla roller</option>
+  <option value="Öppnare">Öppnare</option>
+  <option value="Story">Mellanbit / Story</option>
+  <option value="Callback">Callback</option>
+  <option value="Stängare">Stängare</option>
+  <option value="Roastskämt">Roastskämt</option> {/* Synk med Forge */}
+  <option value="Nyhetsskämt">Nyhetsskämt</option> {/* Synk med Forge */}
+  <option value="Listskämt">Listskämt</option> {/* <-- NY */}
+</select>
                       <select value={selectedRisk} onChange={(e) => setSelectedRisk(e.target.value)} className="bg-neutral-900 border border-neutral-800 rounded px-2 py-1.5 text-neutral-300 outline-none">
                         <option value="Alla">Alla risknivåer</option>
                         <option value="Familj/Företag">Trygg/Företag</option>
