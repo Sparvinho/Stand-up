@@ -10,6 +10,22 @@ import {
 import { supabase } from "../../lib/supabase";
 import { useRouter, useSearchParams } from "next/navigation";
 
+// --- SÄSONGS-KALENDERN ---
+const SEASONAL_TAGS = ["jul", "nyår", "midsommar", "halloween", "påsk", "valborg", "alla hjärtans dag"];
+
+const getActiveSeasons = () => {
+  const m = new Date().getMonth(); // 0 = Jan, 8 = Sep, 11 = Dec
+  const active = [];
+  if (m === 8 || m === 9) active.push("halloween"); // Sep, Okt
+  if (m === 10 || m === 11) active.push("jul", "nyår"); // Nov, Dec
+  if (m === 0) active.push("nyår", "alla hjärtans dag"); // Jan
+  if (m === 1) active.push("alla hjärtans dag"); // Feb
+  if (m === 2 || m === 3) active.push("påsk"); // Mar, Apr
+  if (m === 3 || m === 4) active.push("valborg"); // Apr, Maj
+  if (m === 4 || m === 5) active.push("midsommar"); // Maj, Jun
+  return active;
+};
+
 function SetlistsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -476,7 +492,18 @@ function SetlistsContent() {
 if (selectedStatus !== "Källaren") {
   list = list.filter(bit => bit.status !== "Källaren");
 }
-    
+    // SÄSONGS-FILTRET: Göm säsongsskämt om det inte är rätt månad (och vi inte valt Temagig)
+    if (gigProfile !== 'tema') {
+      const activeSeasons = getActiveSeasons();
+      list = list.filter(bit => {
+        const bitTags = bit.tags?.map((t: string) => t.toLowerCase().trim()) || [];
+        const hasSeasonalTag = bitTags.some((tag: string) => SEASONAL_TAGS.includes(tag));
+        const isActiveSeason = bitTags.some((tag: string) => activeSeasons.includes(tag));
+        
+        // Skämtet visas om det INTE är ett säsongsskämt, ELLER om dess säsong är aktiv nu
+        return !hasSeasonalTag || isActiveSeason;
+      });
+    }
     switch (gigProfile) {
       case 'foretag':
         list = list.filter(b => (b.priority ?? 0) >= 2 && b.status !== 'Råidé' && b.status !== 'Omarbeta' && b.status !== 'Testa');
@@ -489,6 +516,7 @@ if (selectedStatus !== "Källaren") {
         break;
       case 'klubb':
       case 'ingen':
+        
       default:
         break;
     }
@@ -908,6 +936,7 @@ if (selectedStatus !== "Källaren") {
                         <button onClick={() => handleProfileChange('klubb')} className={`px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1 transition-all ${gigProfile === 'klubb' ? 'bg-blue-600 text-white' : 'bg-neutral-900 text-neutral-400 border border-neutral-800'}`}><Mic size={10} /> Klubb</button>
                         <button onClick={() => handleProfileChange('foretag')} className={`px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1 transition-all ${gigProfile === 'foretag' ? 'bg-indigo-600 text-white' : 'bg-neutral-900 text-neutral-400 border border-neutral-800'}`}><Briefcase size={10} /> Företag</button>
                         <button onClick={() => handleProfileChange('test')} className={`px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1 transition-all ${gigProfile === 'test' ? 'bg-orange-600 text-white' : 'bg-neutral-900 text-neutral-400 border border-neutral-800'}`}><Edit3 size={10} /> Test</button>
+                        <button onClick={() => handleProfileChange('tema')} className={`px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1 transition-all ${gigProfile === 'tema' ? 'bg-pink-600 text-white' : 'bg-neutral-900 text-neutral-400 border border-neutral-800'}`}><Sparkles size={10} /> Temagig</button>
                         <button onClick={() => handleProfileChange('special')} className={`px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1 transition-all ${gigProfile === 'special' ? 'bg-purple-600 text-white' : 'bg-neutral-900 text-neutral-400 border border-neutral-800'}`}><Film size={10} /> Special</button>
                       </div>
                     </div>
