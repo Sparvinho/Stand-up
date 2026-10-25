@@ -26,6 +26,9 @@ const getActiveSeasons = () => {
   return active;
 };
 
+type MemoryCard = { start_bit_id: string; title: string };
+type MemoryQuestion = { kind: 'card' | 'next'; index: number };
+
 function SetlistsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -39,6 +42,18 @@ function SetlistsContent() {
   const [targetDurationMinutes, setTargetDurationMinutes] = useState<number>(15);
   const [pacingBuffer, setPacingBuffer] = useState<number>(15);
   const [setlist, setSetlist] = useState<string[]>([]);
+  const [cueOverrides, setCueOverrides] = useState<Record<string, string>>({});
+  const [memoryCards, setMemoryCards] = useState<MemoryCard[]>([]);
+  const [memoryPractice, setMemoryPractice] = useState(false);
+  const [practiceCard, setPracticeCard] = useState(0);
+  const [revealCard, setRevealCard] = useState(false);
+  const [revealCardOrder, setRevealCardOrder] = useState(false);
+  const [randomMemoryPractice, setRandomMemoryPractice] = useState(false);
+  const [memoryQuestion, setMemoryQuestion] = useState<MemoryQuestion | null>(null);
+  const [isRehearsalMode, setIsRehearsalMode] = useState(false);
+  const [rehearsalView, setRehearsalView] = useState<'script' | 'cues' | 'both'>('both');
+  const [stageDensity, setStageDensity] = useState<'compact' | 'comfortable'>('compact');
+  const [saveError, setSaveError] = useState('');
   const [hiddenBits, setHiddenBits] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   
@@ -50,6 +65,7 @@ function SetlistsContent() {
   const [selectedStatus, setSelectedStatus] = useState("Alla");
   const [gigProfile, setGigProfile] = useState<string>("ingen");
   const [minPriority, setMinPriority] = useState<number>(0);
+  const [focusOnly, setFocusOnly] = useState(false);
   const [sortBy, setSortBy] = useState<string>("priority-desc");
   const [selectedRole, setSelectedRole] = useState("Alla");
   const [selectedRisk, setSelectedRisk] = useState("Alla");
@@ -66,12 +82,13 @@ function SetlistsContent() {
   const [gigPhase, setGigPhase] = useState<'live' | 'eval-overall' | 'eval-bits'>('live');
   const [liveSeconds, setLiveSeconds] = useState(0);
   const [isTimerRunning, setIsTimerRunning] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
   const [overallGigScore, setOverallGigScore] = useState<number>(0);
   const [gigNotes, setGigNotes] = useState("");
   const [bitScores, setBitScores] = useState<Record<string, number>>({});
   const [currentEvalIndex, setCurrentEvalIndex] = useState(0);
   const [isPrintMode, setIsPrintMode] = useState(false);
+  const [printMemoryCards, setPrintMemoryCards] = useState(false);
+  const [mobileView, setMobileView] = useState<'set' | 'library' | 'saved'>('set');
   const [touchStart, setTouchStart] = useState({ x: 0, y: 0 });
   const [expandedBitId, setExpandedBitId] = useState<string | null>(null);
   const [expandedLibraryBitId, setExpandedLibraryBitId] = useState<string | null>(null);
@@ -126,7 +143,8 @@ function SetlistsContent() {
         priority: Number(b.priority) || 1,
         duration_seconds: b.duration_seconds !== null && b.duration_seconds !== undefined ? Number(b.duration_seconds) : 0,
         tags: Array.isArray(b.tags) ? b.tags : [],
-        comedy_tags: Array.isArray(b.comedy_tags) ? b.comedy_tags : []
+        comedy_tags: Array.isArray(b.comedy_tags) ? b.comedy_tags : [],
+        stage_cues: typeof b.stage_cues === "string" ? b.stage_cues : ""
       }));
       setAllBits(safeBits);
     }
@@ -136,6 +154,8 @@ function SetlistsContent() {
         ...r,
         bit_ids: Array.isArray(r.bit_ids) ? r.bit_ids.map(String) : [],
         hidden_bit_ids: Array.isArray(r.hidden_bit_ids) ? r.hidden_bit_ids.map(String) : [],
+        cue_overrides: r.cue_overrides && typeof r.cue_overrides === "object" && !Array.isArray(r.cue_overrides) ? r.cue_overrides : {},
+        memory_cards: Array.isArray(r.memory_cards) ? r.memory_cards.filter((card: any) => card && typeof card.start_bit_id === 'string' && typeof card.title === 'string') : [],
         evaluations: r.evaluations || {}
       }));
       setSavedSetlists(safeData);
@@ -147,16 +167,21 @@ function SetlistsContent() {
       const bitToAdd = allBits.find(b => String(b.id) === String(addId));
       if (bitToAdd && !setlist.includes(String(bitToAdd.id))) {
         setSetlist(prev => [...prev, String(bitToAdd.id)]);
+        setCueOverrides(prev => ({ ...prev, [String(bitToAdd.id)]: bitToAdd.stage_cues || "" }));
       }
     }
   }, [addId, allBits]);
 
   const loadSetlist = (setlistObj: any) => {
+    setMobileView('set');
     setActiveId(setlistObj.id);
     setTitle(setlistObj.title || "");
     setVenue(setlistObj.venue || "");
     setPerformedAt(setlistObj.performed_at || null);
     setSetlist(Array.isArray(setlistObj.bit_ids) ? setlistObj.bit_ids.map(String) : []);
+    setCueOverrides(setlistObj.cue_overrides && typeof setlistObj.cue_overrides === "object" ? setlistObj.cue_overrides : {});
+    setMemoryCards(Array.isArray(setlistObj.memory_cards) ? setlistObj.memory_cards : []);
+    setSaveError("");
     setHiddenBits(Array.isArray(setlistObj.hidden_bit_ids) ? setlistObj.hidden_bit_ids.map(String) : []);
     if (setlistObj.evaluations) {
       setOverallGigScore(setlistObj.evaluations.overall || 0);
@@ -171,11 +196,15 @@ function SetlistsContent() {
   };
 
   const startNew = () => {
+    setMobileView('set');
     setActiveId(null);
     setTitle("");
     setVenue("");
     setPerformedAt(null);
     setSetlist([]);
+    setCueOverrides({});
+    setMemoryCards([]);
+    setSaveError("");
     setHiddenBits([]);
     setOverallGigScore(0);
     setGigNotes("");
@@ -183,31 +212,37 @@ function SetlistsContent() {
     setCopilotSuggestions([]);
   };
 
+  // Copy missing entries from the library. This also freezes cues in older setlists
+  // the first time they are saved, so future library edits cannot change a gig.
+  const snapshottedCues = (ids: string[]) => Object.fromEntries(
+    ids.map(id => [id, Object.prototype.hasOwnProperty.call(cueOverrides, id)
+      ? cueOverrides[id] : (allBits.find(b => String(b.id) === id)?.stage_cues || "")])
+  );
+  const getSetCues = (bit: any): string =>
+    Object.prototype.hasOwnProperty.call(cueOverrides, String(bit.id))
+      ? cueOverrides[String(bit.id)] : (bit.stage_cues || "");
+
   const handleSave = async (markAsPerformed = false) => {
     setIsSaving(true);
+    setSaveError("");
     const cleanBitIds = setlist.map(String);
     const cleanHiddenIds = hiddenBits.map(String);
+    const cuesToSave = snapshottedCues(cleanBitIds);
+    const cardsToSave = memoryCards.filter(card => cleanBitIds.includes(card.start_bit_id));
     if (activeId !== null && activeId !== undefined) {
       const { error } = await supabase.from("setlists").update({
-        title, venue, bit_ids: cleanBitIds, hidden_bit_ids: cleanHiddenIds
+        title, venue, bit_ids: cleanBitIds, hidden_bit_ids: cleanHiddenIds, cue_overrides: cuesToSave, memory_cards: cardsToSave
       }).eq("id", activeId);
-      if (!error) { showSaved(); await fetchData(); }
+      if (!error) { setCueOverrides(cuesToSave); showSaved(); await fetchData(); }
+      else setSaveError(error.message);
     } else {
       const { data, error } = await supabase.from("setlists").insert([{
-        title, venue, bit_ids: cleanBitIds, hidden_bit_ids: cleanHiddenIds
+        title, venue, bit_ids: cleanBitIds, hidden_bit_ids: cleanHiddenIds, cue_overrides: cuesToSave, memory_cards: cardsToSave
       }]).select().single();
-      if (data && !error) { setActiveId(data.id); showSaved(); await fetchData(); }
+      if (data && !error) { setCueOverrides(cuesToSave); setActiveId(data.id); showSaved(); await fetchData(); }
+      else if (error) setSaveError(error.message);
     }
     setIsSaving(false);
-  };
-
-  const handleRecordingToggle = () => {
-    if (!isRecording) {
-      setIsRecording(true);
-      setIsTimerRunning(true);
-    } else {
-      setIsRecording(false);
-    }
   };
 
   const handleSwipe = (bitId: string, direction: 'up' | 'down' | 'left' | 'right') => {
@@ -246,12 +281,12 @@ function SetlistsContent() {
     
     if (activeId) {
       await supabase.from("setlists").update({
-        performed_at: currentPerformedAt, evaluations: evaluationData
+        performed_at: currentPerformedAt, evaluations: evaluationData, cue_overrides: snapshottedCues(cleanBitIds), memory_cards: memoryCards.filter(card => cleanBitIds.includes(card.start_bit_id))
       }).eq("id", activeId);
     } else {
       const { data } = await supabase.from("setlists").insert([{
         title, venue, bit_ids: cleanBitIds, hidden_bit_ids: hiddenBits.map(String),
-        performed_at: currentPerformedAt, evaluations: evaluationData
+        performed_at: currentPerformedAt, evaluations: evaluationData, cue_overrides: snapshottedCues(cleanBitIds), memory_cards: memoryCards.filter(card => cleanBitIds.includes(card.start_bit_id))
       }]).select().single();
       if (data) setActiveId(data.id);
     }
@@ -303,7 +338,12 @@ function SetlistsContent() {
   const addBit = (bitId: string) => {
     if (performedAt) return;
     const idStr = String(bitId);
-    if (!setlist.includes(idStr)) { setSetlist([...setlist, idStr]); setCopilotSuggestions([]); }
+    if (!setlist.includes(idStr)) {
+      setSetlist([...setlist, idStr]);
+      const bit = allBits.find(b => String(b.id) === idStr);
+      setCueOverrides(prev => ({ ...prev, [idStr]: bit?.stage_cues || "" }));
+      setCopilotSuggestions([]);
+    }
   };
 
   const removeBit = (e: React.MouseEvent, bitId: string) => {
@@ -311,6 +351,8 @@ function SetlistsContent() {
     if (performedAt) return;
     const idStr = String(bitId);
     setSetlist(setlist.filter(id => id !== idStr));
+    setCueOverrides(prev => { const next = { ...prev }; delete next[idStr]; return next; });
+    setMemoryCards(prev => prev.filter(card => card.start_bit_id !== idStr));
     setCopilotSuggestions([]);
   };
 
@@ -334,6 +376,7 @@ function SetlistsContent() {
     setSelectedStatus("Alla");
     setGigProfile("ingen");
     setMinPriority(0);
+    setFocusOnly(false);
     setSortBy("priority-desc");
     setSelectedRole("Alla");
     setSelectedRisk("Alla");
@@ -353,6 +396,7 @@ function SetlistsContent() {
   const activeFilterCount =
     (gigProfile !== "ingen" ? 1 : 0) +
     (minPriority > 0 ? 1 : 0) +
+    (focusOnly ? 1 : 0) +
     (selectedStatus !== "Alla" ? 1 : 0) +
     (selectedRole !== "Alla" ? 1 : 0) +
     (selectedRisk !== "Alla" ? 1 : 0) +
@@ -370,6 +414,48 @@ function SetlistsContent() {
 
   const setlistBits = setlist.map(id => allBits.find(b => String(b.id) === String(id))).filter(Boolean);
   
+  // Cards start at a particular bit; moving the bit moves the boundary with it.
+  // First card is implicit when at least one explicit boundary exists.
+  const orderedMemoryCards = useMemo(() => {
+    if (!setlist.length || !memoryCards.length) return [];
+    const boundaries = memoryCards.filter(card => setlist.includes(card.start_bit_id));
+    const first = boundaries.find(card => card.start_bit_id === setlist[0]);
+    const result: { title: string; bits: any[]; start_bit_id: string }[] = [];
+    let current: { title: string; bits: any[]; start_bit_id: string } | null = null;
+    for (const bit of setlistBits) {
+      const boundary = boundaries.find(card => card.start_bit_id === String(bit.id));
+      if (!current || boundary) {
+        current = { title: boundary?.title || (result.length === 0 ? first?.title || 'Lapp 1' : `Lapp ${result.length + 1}`), bits: [], start_bit_id: String(bit.id) };
+        result.push(current);
+      }
+      current.bits.push(bit);
+    }
+    return result;
+  }, [memoryCards, setlist, allBits]);
+
+  // Mix two recall tasks: remember the jokes on a random card, or name the next card.
+  // The last card cannot be the subject of a "what comes next?" question.
+  const nextMemoryQuestion = (previous: MemoryQuestion | null = null) => {
+    const candidates: MemoryQuestion[] = orderedMemoryCards.flatMap((_, index) => [
+      { kind: 'card' as const, index },
+      ...(index < orderedMemoryCards.length - 1 ? [{ kind: 'next' as const, index }] : []),
+    ]);
+    const fresh = candidates.filter(q => !previous || q.kind !== previous.kind || q.index !== previous.index);
+    const pool = fresh.length ? fresh : candidates;
+    setMemoryQuestion(pool.length ? pool[Math.floor(Math.random() * pool.length)] : null);
+    setRevealCard(false);
+  };
+
+  const toggleMemoryBoundary = (id: string) => {
+    if (performedAt) return;
+    setMemoryCards(prev => {
+      if (prev.some(card => card.start_bit_id === id)) return prev.filter(card => card.start_bit_id !== id);
+      const withFirst = prev.length === 0 && setlist.length && setlist[0] !== id
+        ? [{ start_bit_id: setlist[0], title: 'Lapp 1' }] : prev;
+      return [...withFirst, { start_bit_id: id, title: `Lapp ${withFirst.length + 1}` }];
+    });
+  };
+
   const rawMaterialSeconds = useMemo(() => {
     return setlistBits.reduce((acc, bit) => acc + (bit.duration_seconds ?? 0), 0);
   }, [setlistBits]);
@@ -463,7 +549,10 @@ function SetlistsContent() {
   const filteredAvailableBits = useMemo(() => {
     let list = allBits
       .filter(bit => !setlist.includes(String(bit.id)))
-      .filter(bit => bit.status !== "Pensionerad");
+      .filter(bit => bit.status !== "Pensionerad")
+      // Comedy Writer marks routine-only components as "I rutin".
+      // Exclude them from available standalone stage material.
+      .filter(bit => (bit.status || "").trim().toLowerCase() !== "i rutin");
 
     // 1. AI TEMA-FILTRET (Körs först)
     if (aiSuggestedIds !== null && Array.isArray(aiSuggestedIds)) {
@@ -509,6 +598,7 @@ function SetlistsContent() {
 
     // Standard filters
     if (minPriority > 0) list = list.filter(bit => (bit.priority || 1) >= minPriority);
+    if (focusOnly) list = list.filter(bit => bit.is_focused === true);
     if (selectedStatus !== "Alla") {
       list = list.filter(bit => {
         const s = bit.status?.toLowerCase();
@@ -547,7 +637,36 @@ function SetlistsContent() {
     });
 
   // GLÖM INTE aiSuggestedIds HÄR NERE!
-  }, [allBits, setlist, searchQuery, selectedStatus, gigProfile, minPriority, sortBy, selectedRole, selectedRisk, selectedFormat, selectedMood, selectedTag, hiddenBits, aiSuggestedIds]);
+  }, [allBits, setlist, searchQuery, selectedStatus, gigProfile, minPriority, focusOnly, sortBy, selectedRole, selectedRisk, selectedFormat, selectedMood, selectedTag, hiddenBits, aiSuggestedIds]);
+
+  if (isPrintMode && printMemoryCards && orderedMemoryCards.length > 0) {
+    return (
+      <div className="memory-print-screen fixed inset-0 z-[100] bg-white text-black overflow-auto">
+        <div className="memory-print-controls print:hidden sticky top-0 z-10 flex flex-wrap items-center justify-between gap-2 bg-neutral-900 text-white p-3">
+          <div className="text-sm">4 minneslappar per A4 (A6-format). Välj A4, stående, skala 100 % och inga marginaler i utskriftsdialogen.</div>
+          <button onClick={() => setIsPrintMode(false)} className="rounded bg-neutral-700 p-2" aria-label="Stäng utskrift"><X size={20}/></button>
+        </div>
+        <div className="memory-print-pages">
+          {Array.from({ length: Math.ceil(orderedMemoryCards.length / 4) }, (_, page) => (
+            <div className="memory-print-page" key={page}>
+              {orderedMemoryCards.slice(page * 4, page * 4 + 4).map((card, i) => (
+                <section className="memory-print-card" key={card.start_bit_id}>
+                  <header className="memory-print-card-heading">
+                    <span className="memory-print-card-number">LAPP {page * 4 + i + 1}</span>
+                    <h2>{card.title}</h2>
+                    <span className="memory-print-card-count">{card.bits.length} skämt</span>
+                  </header>
+                  <ol className="memory-print-jokes">
+                    {card.bits.map((bit: any) => <li key={bit.id}>{bit.title}</li>)}
+                  </ol>
+                </section>
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   if (isPrintMode) {
     return (
@@ -564,9 +683,89 @@ function SetlistsContent() {
             {setlistBits.map((bit) => (
               <li key={bit.id} className="pl-2 border-b border-neutral-300 pb-3">
                 <span className="leading-tight">{bit.title}</span>
+                {getSetCues(bit) && <p className="font-normal text-base md:text-xl mt-1 text-neutral-700 whitespace-pre-wrap">{getSetCues(bit)}</p>}
               </li>
             ))}
           </ol>
+        </div>
+      </div>
+    );
+  }
+
+  if (isRehearsalMode) {
+    return (
+      <div className="fixed inset-0 z-[100] bg-[#111114] text-white overflow-y-auto p-4 md:p-10">
+        <div className="max-w-3xl mx-auto">
+          <div className="flex items-center justify-between gap-3 mb-6">
+            <div><p className="text-xs uppercase tracking-widest text-purple-400 mb-1">Repetera</p><h1 className="font-bold text-xl md:text-3xl">{title || 'Namnlös setlist'}</h1></div>
+            <button onClick={() => setIsRehearsalMode(false)} className="rounded-lg bg-neutral-800 px-3 py-2 text-sm flex gap-2 items-center"><X size={16}/> Stäng</button>
+          </div>
+          {orderedMemoryCards.length > 0 && (
+            <div className="flex gap-2 mb-5">
+              <button onClick={() => { setMemoryPractice(false); setRevealCard(false); }} className={`rounded-lg px-3 py-2 text-sm ${!memoryPractice ? 'bg-purple-600' : 'bg-neutral-800'}`}>Vanlig repetition</button>
+              <button onClick={() => { setMemoryPractice(true); setPracticeCard(0); setRevealCard(false); setRevealCardOrder(false); }} className={`rounded-lg px-3 py-2 text-sm ${memoryPractice ? 'bg-purple-600' : 'bg-neutral-800'}`}>Minneslappar</button>
+            </div>
+          )}
+          {memoryPractice && orderedMemoryCards.length > 0 ? (
+            <div className="rounded-2xl border border-purple-800/50 bg-neutral-900 p-5 space-y-5">
+              <div className="flex flex-wrap gap-2" role="group" aria-label="Träningssätt för minneslappar">
+                <button onClick={() => { setRandomMemoryPractice(false); setRevealCard(false); }} aria-pressed={!randomMemoryPractice} className={`rounded-lg px-3 py-2 text-sm ${!randomMemoryPractice ? 'bg-purple-600' : 'bg-neutral-800'}`}>Lapp för lapp</button>
+                <button onClick={() => { setRandomMemoryPractice(true); nextMemoryQuestion(); }} aria-pressed={randomMemoryPractice} className={`rounded-lg px-3 py-2 text-sm ${randomMemoryPractice ? 'bg-purple-600' : 'bg-neutral-800'}`}>Slumpträning</button>
+              </div>
+              {randomMemoryPractice ? (
+                memoryQuestion ? <>
+                  <div className="text-xs uppercase tracking-widest text-purple-300">{memoryQuestion.kind === 'card' ? 'Minns skämten' : 'Minns nästa lapp'}</div>
+                  <h2 className="text-2xl font-bold">{memoryQuestion.kind === 'card'
+                    ? orderedMemoryCards[memoryQuestion.index].title
+                    : `Vad kommer efter lappen ”${orderedMemoryCards[memoryQuestion.index].title}”?`}</h2>
+                  <p className="text-neutral-400 text-sm">{memoryQuestion.kind === 'card'
+                    ? 'Säg skämtnamnen i rätt ordning.'
+                    : 'Säg namnet på lappen som kommer härnäst.'}</p>
+                  {revealCard ? (
+                    memoryQuestion.kind === 'card'
+                      ? <ol className="list-decimal list-inside space-y-2 text-lg">{orderedMemoryCards[memoryQuestion.index].bits.map(bit => <li key={bit.id}>{bit.title}</li>)}</ol>
+                      : <p className="rounded-lg border border-purple-800 bg-purple-950/30 px-4 py-5 text-xl font-semibold">{orderedMemoryCards[memoryQuestion.index + 1].title}</p>
+                  ) : <p className="rounded-lg border border-dashed border-neutral-700 py-8 text-center text-neutral-500">Svaret är dolt</p>}
+                  <button className="w-full rounded-lg bg-purple-600 py-3 font-bold" onClick={() => setRevealCard(v => !v)}>{revealCard ? 'Dölj svaret' : 'Visa svaret'}</button>
+                  <button className="w-full rounded-lg bg-neutral-800 py-3 font-bold" onClick={() => nextMemoryQuestion(memoryQuestion)}>Nästa slumpfråga</button>
+                  {orderedMemoryCards.length === 1 && <p className="text-neutral-400 text-xs">Lägg till en minneslapp för att även träna på lapparnas ordning.</p>}
+                </> : <p className="text-neutral-400">Inga frågor finns för det här setet.</p>
+              ) : <>
+                <div className="text-sm text-purple-300">Lapp {practiceCard + 1} av {orderedMemoryCards.length}</div>
+                <h2 className="text-2xl font-bold">{orderedMemoryCards[Math.min(practiceCard, orderedMemoryCards.length - 1)].title}</h2>
+                <p className="text-neutral-400 text-sm">Försök säga skämtnamnen i rätt ordning innan du visar svaret.</p>
+                {revealCard ? (
+                  <ol className="list-decimal list-inside space-y-2 text-lg">
+                    {orderedMemoryCards[Math.min(practiceCard, orderedMemoryCards.length - 1)].bits.map(bit => <li key={bit.id}>{bit.title}</li>)}
+                  </ol>
+                ) : <p className="rounded-lg border border-dashed border-neutral-700 py-8 text-center text-neutral-500">Skämten är dolda</p>}
+                <button className="w-full rounded-lg bg-purple-600 py-3 font-bold" onClick={() => setRevealCard(v => !v)}>{revealCard ? 'Dölj skämten' : 'Visa skämten'}</button>
+                <div className="flex gap-2">
+                  <button disabled={practiceCard === 0} className="flex-1 bg-neutral-800 rounded-lg py-3 disabled:opacity-30" onClick={() => { setPracticeCard(v => v - 1); setRevealCard(false); }}>Föregående</button>
+                  <button disabled={practiceCard >= orderedMemoryCards.length - 1} className="flex-1 bg-neutral-800 rounded-lg py-3 disabled:opacity-30" onClick={() => { setPracticeCard(v => v + 1); setRevealCard(false); }}>Nästa lapp</button>
+                </div>
+                <div className="border-t border-neutral-800 pt-4">
+                  <p className="text-xs uppercase text-neutral-500 mb-2">Lapparnas ordning</p>
+                  <button className="text-purple-300 text-sm underline" onClick={() => setRevealCardOrder(v => !v)}>{revealCardOrder ? orderedMemoryCards.map(c => c.title).join(' → ') : 'Visa ordningen på alla lappar'}</button>
+                </div>
+              </>}
+            </div>
+          ) : <>
+          <div className="flex gap-2 mb-6" role="group" aria-label="Visa i repetitionsläge">
+            {([['script', 'Manus'], ['cues', 'Stödord'], ['both', 'Båda']] as const).map(([mode, label]) => (
+              <button key={mode} onClick={() => setRehearsalView(mode)} aria-pressed={rehearsalView === mode} className={`rounded-lg px-3 py-2 text-sm ${rehearsalView === mode ? 'bg-purple-600 text-white' : 'bg-neutral-800 text-neutral-400'}`}>{label}</button>
+            ))}
+          </div>
+          <div className="space-y-4 pb-16">
+            {setlistBits.map((bit, i) => (
+              <article key={bit.id} className="border border-neutral-800 bg-neutral-900/70 rounded-xl p-4">
+                <div className="flex items-baseline justify-between gap-3 mb-2"><h2 className="text-lg font-bold"><span className="text-purple-400 mr-2">{i + 1}.</span>{bit.title}</h2><span className="text-xs text-neutral-500 shrink-0">{Math.round((bit.duration_seconds || 0) / 60 * 10) / 10} min</span></div>
+                {rehearsalView !== 'script' && <p className="text-purple-200 whitespace-pre-wrap text-sm mb-2">{getSetCues(bit) || 'Inga stödord ännu'}</p>}
+                {rehearsalView !== 'cues' && <p className="text-neutral-300 whitespace-pre-wrap text-sm leading-relaxed">{bit.premise || 'Ingen skämttext'}</p>}
+              </article>
+            ))}
+          </div>
+          </>}
         </div>
       </div>
     );
@@ -580,41 +779,45 @@ function SetlistsContent() {
       const timerColor = timeLeft < 0 ? "text-red-500 animate-pulse" : timeLeft <= 120 ? "text-yellow-400" : "text-green-400";
       
       return (
-        <div className="fixed inset-0 z-50 bg-black text-white flex flex-col p-4 md:p-12 overflow-y-auto">
-          <div className="flex flex-col md:flex-row items-center md:justify-between border-b border-neutral-800 pb-6 mb-6 md:mb-8 gap-4 md:gap-6 text-center md:text-left">
+        <div className="fixed inset-0 z-[100] bg-black text-white flex flex-col p-3 md:p-12 overflow-y-auto">
+          <div className="flex flex-wrap items-center justify-between border-b border-neutral-800 pb-2 mb-2 md:pb-4 md:mb-4 gap-2 md:gap-6 text-left">
             <div>
-              <h1 className="text-xl md:text-3xl font-bold text-neutral-500 uppercase tracking-widest">{title || "Namnlös Setlist"}</h1>
+              <h1 className="text-sm md:text-2xl font-bold text-neutral-300 uppercase tracking-wider">{title || "Namnlös Setlist"}</h1>
             </div>
-            <div className="flex items-center gap-4 md:gap-6 bg-neutral-950 border border-neutral-800 px-4 md:px-6 py-2 md:py-3 rounded-2xl shadow-xl w-full md:w-auto justify-between md:justify-center">
+            <div className="flex items-center gap-2 md:gap-4 bg-neutral-950 border border-neutral-800 px-2 md:px-4 py-1 md:py-2 rounded-xl shadow-xl justify-between">
               <div className="flex flex-col items-center">
-                <span className={`text-4xl md:text-5xl font-mono font-black ${timerColor}`}>{String(liveMin).padStart(2, '0')}:{String(liveSec).padStart(2, '0')}</span>
+                <span className={`text-xl md:text-3xl font-mono font-black ${timerColor}`}>{String(liveMin).padStart(2, '0')}:{String(liveSec).padStart(2, '0')}</span>
               </div>
               <div className="flex items-center gap-2 border-l border-neutral-800 pl-4">
-                <button
-                  onClick={handleRecordingToggle}
-                  className={`p-2 md:p-3 rounded-full transition-all ${isRecording ? 'bg-red-600/20 text-red-500 animate-pulse' : 'bg-neutral-900 text-neutral-400 hover:text-white'}`}
-                  title={isRecording ? "Inspelning rullar" : "Starta Inspelning & Timer"}
-                >
-                  <Mic size={24} />
-                </button>
+                {/* Timer only. The old microphone icon did not make an audio recording. */}
                 <button onClick={() => setIsTimerRunning(!isTimerRunning)} className="p-2 md:p-3 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white transition-colors">
                   {isTimerRunning ? <Pause size={20} /> : <Play size={20} className="fill-white" />}
                 </button>
               </div>
             </div>
-            <div className="flex gap-2 w-full md:w-auto mt-2 md:mt-0">
+            <div className="flex gap-2 w-auto mt-0">
               {!performedAt && (
-                <button onClick={() => { setGigPhase('eval-overall'); setIsTimerRunning(false); setIsRecording(false); }} className="w-full md:w-auto justify-center px-4 md:px-6 py-3 bg-green-600 hover:bg-green-500 text-white font-bold rounded-lg transition-colors flex items-center gap-2">
-                  <Check size={18} /> Avsluta Gig
+                <button onClick={() => { setGigPhase('eval-overall'); setIsTimerRunning(false); }} className="justify-center px-2 md:px-4 py-2 bg-neutral-800 hover:bg-green-700 hover:bg-green-500 text-white font-bold rounded-lg transition-colors flex items-center gap-2">
+                  <Check size={14} /> Avsluta
                 </button>
               )}
             </div>
           </div>
-          <div className="max-w-4xl mx-auto w-full space-y-8 md:space-y-10 pb-24">
+          <div className="max-w-4xl mx-auto w-full flex justify-end gap-2 pb-2">
+            <button onClick={() => setStageDensity('compact')} aria-pressed={stageDensity === 'compact'} className={`text-xs rounded px-3 py-1.5 ${stageDensity === 'compact' ? 'bg-neutral-700' : 'bg-neutral-900 text-neutral-400'}`}>Kompakt</button>
+            <button onClick={() => setStageDensity('comfortable')} aria-pressed={stageDensity === 'comfortable'} className={`text-xs rounded px-3 py-1.5 ${stageDensity === 'comfortable' ? 'bg-neutral-700' : 'bg-neutral-900 text-neutral-400'}`}>Stor text</button>
+          </div>
+          <div className={`max-w-4xl mx-auto w-full ${stageDensity === 'compact' ? 'space-y-2' : 'space-y-5'} pb-8`}>
             {setlistBits.map((bit, index) => (
-              <div key={bit.id} className="flex gap-4 md:gap-6 items-start border-l-4 border-neutral-800 pl-4 md:pl-8">
-                <span className="text-2xl md:text-3xl font-black text-neutral-700 shrink-0 mt-1 md:mt-2">{index + 1}.</span>
-                <h2 className="text-3xl sm:text-4xl md:text-6xl font-extrabold tracking-tight leading-tight">{bit.title}</h2>
+              <div key={bit.id}>
+              {memoryCards.find(card => card.start_bit_id === String(bit.id)) && <div className="mt-2 mb-1 border-t border-purple-900/60 pt-1 text-xs uppercase tracking-widest text-purple-300 font-semibold">{memoryCards.find(card => card.start_bit_id === String(bit.id))?.title}</div>}
+              <div className={`border-l-2 border-neutral-700 ${stageDensity === 'compact' ? 'pl-3 py-1' : 'pl-4 py-2'}`}>
+                <div className="flex items-baseline gap-3 justify-between">
+                  <h2 className={`${stageDensity === 'compact' ? 'text-lg sm:text-xl' : 'text-2xl sm:text-3xl'} font-extrabold tracking-tight leading-tight`}><span className="text-purple-400 mr-2">{index + 1}.</span>{bit.title}</h2>
+                  <span className="shrink-0 text-xs text-neutral-500">{Math.round((bit.duration_seconds || 0) / 60 * 10) / 10} min</span>
+                </div>
+                {getSetCues(bit) && <p className={`${stageDensity === 'compact' ? 'text-sm' : 'text-base sm:text-lg'} text-neutral-300 mt-1 whitespace-pre-wrap leading-snug`}>{getSetCues(bit)}</p>}
+              </div>
               </div>
             ))}
           </div>
@@ -721,8 +924,15 @@ function SetlistsContent() {
 
   return (
     <div className="min-h-[100dvh] md:h-[100dvh] flex flex-col md:flex-row bg-[#08080c] text-white md:overflow-hidden">
+      <nav className="md:hidden sticky top-0 z-30 flex w-full shrink-0 gap-1 border-b border-purple-900/40 bg-[#101016] p-2" aria-label="Setbyggarens mobilvy">
+        {([['set', 'Setlista'], ['library', 'Bibliotek'], ['saved', 'Sparade']] as const).map(([view, label]) => (
+          <button key={view} onClick={() => setMobileView(view)} aria-pressed={mobileView === view} className={`flex-1 rounded-lg px-2 py-3 text-sm font-bold ${mobileView === view ? 'bg-purple-600 text-white' : 'bg-neutral-800 text-neutral-300'}`}>
+            {label}{view === 'set' && setlist.length > 0 ? ` (${setlist.length})` : ''}
+          </button>
+        ))}
+      </nav>
       {/* Vänster Meny: Sparade Setlists */}
-      <div className="w-full md:w-80 border-b md:border-b-0 md:border-r border-indigo-950/40 bg-neutral-900/40 p-4 md:p-6 flex flex-col h-[35dvh] md:h-full shrink-0">
+      <div className={`${mobileView === 'saved' ? 'flex' : 'hidden'} md:flex w-full md:w-80 border-b md:border-b-0 md:border-r border-indigo-950/40 bg-neutral-900/40 p-4 md:p-6 flex-col h-[calc(100dvh-64px)] md:h-full shrink-0`}>
         <div className="mb-4 md:mb-6 flex items-center justify-between">
           <h2 className="text-base md:text-lg font-bold text-indigo-400 flex items-center gap-2 tracking-wide">
             <ListMusic className="text-purple-500" size={18} /> Setlists
@@ -765,7 +975,7 @@ function SetlistsContent() {
       </div>
 
       {/* Höger Sida: Byggaren */}
-      <div className="flex-1 p-4 md:p-10 flex flex-col md:h-full md:overflow-y-auto">
+      <div className={`${mobileView === 'saved' ? 'hidden' : 'flex'} md:flex flex-1 p-3 md:p-10 flex-col min-w-0 md:h-full md:overflow-y-auto`}>
         {/* Setlist Header */}
         <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start mb-4 shrink-0 border-b border-purple-950/20 pb-4 gap-4">
           <div className="flex-1 w-full max-w-xl">
@@ -780,11 +990,15 @@ function SetlistsContent() {
             </div>
           </div>
           <div className="flex flex-wrap gap-2 items-end w-full lg:w-auto">
-            {setlistBits.length > 0 && <button onClick={() => setIsPrintMode(true)} className="flex items-center justify-center flex-1 lg:flex-none gap-2 px-3 py-2 md:px-3.5 md:py-2.5 rounded-lg font-bold transition-all bg-neutral-800 hover:bg-neutral-700 text-white border border-neutral-700 text-xs md:text-sm"><Printer size={16} /> <span className="hidden lg:inline">Fusklapp</span></button>}
-            {setlistBits.length > 0 && !performedAt && <button onClick={() => { setIsGigMode(true); setIsTimerRunning(false); setIsRecording(false); }} className="flex items-center justify-center flex-1 lg:flex-none gap-2 px-4 py-2 md:px-5 md:py-2.5 rounded-lg font-bold bg-purple-600 hover:bg-purple-500 text-white shadow-lg text-xs md:text-sm"><Play size={16} className="fill-white" /> Starta Gig</button>}
+            {setlistBits.length > 0 && <button onClick={() => setIsRehearsalMode(true)} className="flex items-center justify-center flex-1 lg:flex-none gap-2 px-3 py-2 md:px-3.5 md:py-2.5 rounded-lg font-bold bg-neutral-800 hover:bg-neutral-700 text-white border border-neutral-700 text-xs md:text-sm"><Edit3 size={16} /> Repetera</button>}
+            {setlistBits.length > 0 && <button onClick={() => { setPrintMemoryCards(false); setIsPrintMode(true); }} className="flex items-center justify-center flex-1 lg:flex-none gap-2 px-3 py-2 md:px-3.5 md:py-2.5 rounded-lg font-bold transition-all bg-neutral-800 hover:bg-neutral-700 text-white border border-neutral-700 text-xs md:text-sm"><Printer size={16} /> <span className="hidden lg:inline">Fusklapp</span></button>}
+            {orderedMemoryCards.length > 0 && <button onClick={() => { setPrintMemoryCards(true); setIsPrintMode(true); }} className="flex items-center justify-center flex-1 lg:flex-none gap-2 px-3 py-2 md:px-3.5 md:py-2.5 rounded-lg font-bold bg-neutral-800 hover:bg-neutral-700 text-white border border-purple-800 text-xs md:text-sm"><Printer size={16} /> Skriv ut A6-lappar</button>}
+            {setlistBits.length > 0 && !performedAt && <button onClick={() => { setIsGigMode(true); setIsTimerRunning(false); }} className="flex items-center justify-center flex-1 lg:flex-none gap-2 px-4 py-2 md:px-5 md:py-2.5 rounded-lg font-bold bg-purple-600 hover:bg-purple-500 text-white shadow-lg text-xs md:text-sm"><Play size={16} className="fill-white" /> Starta Gig</button>}
             {!performedAt && <button onClick={() => handleSave()} disabled={isSaving || !title} className={`flex items-center justify-center flex-1 lg:flex-none gap-2 px-4 py-2 md:px-5 md:py-2.5 rounded-lg text-xs md:text-sm font-bold bg-neutral-800 hover:bg-neutral-700 text-white border border-neutral-700 ${(isSaving || !title) ? "opacity-50 cursor-not-allowed" : ""}`}>{saved ? <Check size={16} /> : <Save size={16} />} Spara</button>}
           </div>
         </div>
+
+        {saveError && <p role="alert" className="mb-3 rounded-lg border border-red-700 bg-red-950/40 text-red-200 px-3 py-2 text-sm">Setlistan kunde inte sparas: {saveError}. Kontrollera att databasmigreringen är installerad.</p>}
 
         {/* TIDSBUDGET */}
         {!performedAt && (
@@ -821,7 +1035,7 @@ function SetlistsContent() {
           
           {/* VÄNSTER: Bibliotek (Döljs om genomförd) */}
           {!performedAt && (
-            <div className="flex-1 bg-neutral-900/50 border border-neutral-800/80 rounded-xl flex flex-col overflow-hidden h-[50dvh] xl:h-auto min-h-[350px]">
+            <div className={`${mobileView === 'library' ? 'flex' : 'hidden'} md:flex flex-1 bg-neutral-900/50 border border-neutral-800/80 rounded-xl flex-col overflow-hidden h-[calc(100dvh-320px)] xl:h-auto min-h-[350px]`}>
               <div className="p-3 md:p-4 border-b border-neutral-800 space-y-2 md:space-y-3">
                 <div className="flex justify-between items-center">
                   <h3 className="font-semibold text-neutral-300 text-xs md:text-sm flex items-center gap-2">
@@ -842,6 +1056,16 @@ function SetlistsContent() {
                       {activeFilterCount > 0 && `(${activeFilterCount})`}
                     </button>
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setFocusOnly(value => !value)}
+                    aria-pressed={focusOnly}
+                    className={`self-start flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-bold transition-colors ${focusOnly ? 'bg-amber-500/15 border-amber-500/50 text-amber-300' : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-amber-300'}`}
+                    title="Visa bara skämt markerade Fokus i Comedy Writer"
+                  >
+                    <Flame size={14} fill={focusOnly ? 'currentColor' : 'none'} /> Bara Fokus
+                  </button>
 
                   <div className="relative w-full">
                     <Sparkles size={14} className={`absolute left-3 top-1/2 -translate-y-1/2 ${aiSuggestedIds !== null ? 'text-pink-400 animate-pulse' : 'text-pink-600/50'}`} />
@@ -1005,7 +1229,7 @@ function SetlistsContent() {
           )}
 
           {/* HÖGER: Setlistan */}
-          <div className={`${performedAt ? 'w-full max-w-3xl mx-auto h-[60dvh]' : 'flex-1 h-[60dvh] xl:h-auto min-h-[400px]'} bg-purple-950/10 border border-purple-900/30 rounded-xl flex flex-col overflow-hidden shadow-inner`}>
+          <div className={`${mobileView === 'set' ? 'flex' : 'hidden'} md:flex ${performedAt ? 'w-full max-w-3xl mx-auto h-[65dvh]' : 'flex-1 h-[65dvh] xl:h-auto min-h-[400px]'} bg-purple-950/10 border border-purple-900/30 rounded-xl flex flex-col overflow-hidden shadow-inner`}>
             <div className="p-3 md:p-4 border-b border-purple-950/30 bg-neutral-900/80 flex justify-between items-center">
               <h3 className="font-semibold text-purple-300 text-xs md:text-sm flex items-center gap-2"><ListMusic size={14} className="text-purple-400 md:w-4 md:h-4" /> Ordning</h3>
             </div>
@@ -1016,7 +1240,16 @@ function SetlistsContent() {
                 const hasSwipes = bit.gig_stats && bit.gig_stats.current && (bit.gig_stats.current.guld > 0 || bit.gig_stats.current.bra > 0 || bit.gig_stats.current.bomb > 0);
                 
                 return (
-                  <div key={bit.id} draggable={!performedAt} onDragStart={(e) => onDragStart(e, index)} onDragOver={(e) => onDragOver(e, index)} onDrop={(e) => onDrop(e, index)} className={`p-2.5 md:p-3 bg-neutral-950 border-l-4 border-neutral-800 border-y border-r rounded-lg flex items-center justify-between ${!performedAt ? 'cursor-grab active:cursor-grabbing hover:border-purple-500/40' : ''}`}>
+                  <div key={bit.id} className="space-y-1">
+                    {(memoryCards.some(card => card.start_bit_id === String(bit.id))) && (
+                      <div className="rounded-lg border border-purple-800/50 bg-purple-950/30 p-2 flex items-center gap-2">
+                        <span className="text-purple-300 text-xs font-bold shrink-0">Minneslapp</span>
+                        <input aria-label="Minneslappens tema" disabled={!!performedAt} className="min-w-0 flex-1 bg-neutral-950 border border-neutral-700 rounded px-2 py-1 text-xs text-white" value={memoryCards.find(card => card.start_bit_id === String(bit.id))?.title || ''} onChange={e => setMemoryCards(prev => prev.map(card => card.start_bit_id === String(bit.id) ? {...card, title: e.target.value} : card))} />
+                        {!performedAt && <button title="Ta bort lappgräns" onClick={() => toggleMemoryBoundary(String(bit.id))}><X size={14}/></button>}
+                      </div>
+                    )}
+                    {!performedAt && !memoryCards.some(card => card.start_bit_id === String(bit.id)) && <button onClick={() => toggleMemoryBoundary(String(bit.id))} className="text-[10px] text-purple-400/70 hover:text-purple-200 px-2">+ Ny minneslapp här</button>}
+                  <div draggable={!performedAt} onDragStart={(e) => onDragStart(e, index)} onDragOver={(e) => onDragOver(e, index)} onDrop={(e) => onDrop(e, index)} className={`p-2.5 md:p-3 bg-neutral-950 border-l-4 border-neutral-800 border-y border-r rounded-lg flex items-center justify-between ${!performedAt ? 'cursor-grab active:cursor-grabbing hover:border-purple-500/40' : ''}`}>
                     <div className="flex items-center gap-2 md:gap-2.5 w-full">
                       {!performedAt && <GripVertical size={16} className="text-neutral-600 hidden md:block" />}
                       {!performedAt && (
@@ -1041,6 +1274,21 @@ function SetlistsContent() {
                         </div>
                         {!performedAt && collisionInfo && <div className="mt-1 text-red-400 text-[9px] md:text-[10px] font-bold"><AlertOctagon size={10} className="inline mr-1" />{collisionInfo}</div>}
                         
+                        {/* Setets egna stödord – originalet i biblioteket förblir oförändrat. */}
+                        {!performedAt && (
+                          <div className="mt-2" onClick={e => e.stopPropagation()}>
+                            <label htmlFor={`set-cue-${bit.id}`} className="block text-[10px] uppercase tracking-wide font-bold text-purple-400 mb-1">Stödord i detta set</label>
+                            <textarea
+                              id={`set-cue-${bit.id}`}
+                              rows={2}
+                              value={getSetCues(bit)}
+                              onChange={e => setCueOverrides(prev => ({ ...prev, [String(bit.id)]: e.target.value }))}
+                              placeholder="Egna stödord till det här giget…"
+                              className="w-full resize-y bg-neutral-900 border border-neutral-700 rounded-md p-2 text-xs text-white outline-none focus:border-purple-500"
+                            />
+                            <button onClick={() => setCueOverrides(prev => ({ ...prev, [String(bit.id)]: bit.stage_cues || '' }))} className="text-[10px] text-neutral-400 hover:text-purple-300 mt-1">Återställ från biblioteket</button>
+                          </div>
+                        )}
                         {/* HÄR FÄLLS TEXTEN UT */}
                         {expandedBitId === bit.id && (
                           <div className="mt-2 p-2.5 md:p-3 bg-neutral-900 border border-neutral-800 rounded-lg text-xs md:text-sm text-neutral-300 leading-relaxed shadow-inner">
@@ -1050,6 +1298,7 @@ function SetlistsContent() {
                       </div>
                     </div>
                     {!performedAt && <button onClick={(e) => removeBit(e, bit.id)} className="text-neutral-600 hover:text-red-400 p-1 md:p-1.5 ml-1 md:ml-2"><Trash2 size={14} className="md:w-[15px] md:h-[15px]" /></button>}
+                  </div>
                   </div>
                 );
               })}

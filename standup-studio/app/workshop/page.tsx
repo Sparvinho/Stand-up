@@ -20,6 +20,7 @@ function WorkshopContent() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [premise, setPremise] = useState("");
+  const [stageCues, setStageCues] = useState("");
   const [status, setStatus] = useState("Råidé");
   const [priority, setPriority] = useState<number>(1);
   const [mood, setMood] = useState("Avmätt");
@@ -80,6 +81,7 @@ function WorkshopContent() {
   // Tvättar bort HTML-kod
   const cleanPremise = (data.premise || "").replace(/<[^>]*>?/gm, "").replace(/&nbsp;/g, " ");
   setPremise(cleanPremise);
+  setStageCues(data.stage_cues || "");
   setLastSavedPremise(cleanPremise);
   
   let dbStatus = data.status || "Råidé";
@@ -112,7 +114,7 @@ function WorkshopContent() {
     }
     
     const payload = {
-      title, premise, status, priority, mood, role,
+      title, premise, stage_cues: stageCues, status, priority, mood, role,
       risk_level: riskLevel, format, duration_seconds: durationSeconds,
       is_meta: isMeta, is_focused: isFocused, // SPARA FOKUS I DATABASEN
       tags: tags || [], comedy_tags: comedyTags || [], history: updatedHistory,
@@ -186,6 +188,7 @@ function WorkshopContent() {
     setActiveId(null);
     setTitle("");
     setPremise("");
+    setStageCues("");
     setLastSavedPremise("");
     setStatus("Råidé");
     setPriority(1);
@@ -302,11 +305,11 @@ function WorkshopContent() {
                   <Layers size={14} /> <span className="hidden sm:inline">Till Setlist</span>
                 </button>
                 <button
-                  onClick={() => router.push(`/rutinbyggaren?addBit=${activeId}`)}
-                  title="Lägg till i Rutinbyggaren"
+                  onClick={() => router.push(`/setlists?add=${activeId}`)}
+                  title="Lägg till i en setlist"
                   className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-neutral-400 hover:text-white hover:bg-neutral-900 border border-neutral-800 transition-all"
                 >
-                  <AlignLeft size={14} /> <span className="hidden sm:inline">Till Rutinbyggaren</span>
+                  <AlignLeft size={14} /> <span className="hidden sm:inline">Till setlist</span>
                 </button>
                 <button
                   onClick={handleDelete}
@@ -509,6 +512,17 @@ function WorkshopContent() {
           placeholder="Skriv din premiss, observation och setup här..."
           value={premise} onChange={(e) => setPremise(e.target.value)}
         />
+
+        {/* Standardstödord som följer med när skämtet läggs i ett nytt set. */}
+        <div className="shrink-0 border-t border-neutral-800/60 pt-5 mb-6">
+          <label htmlFor="stage-cues" className="block text-xs font-bold text-purple-300 uppercase tracking-wider mb-2">Stödord på scen</label>
+          <textarea
+            id="stage-cues" value={stageCues} onChange={e => setStageCues(e.target.value)}
+            rows={2} placeholder="T.ex. Tinder → konstig profil → första dejten"
+            className="w-full bg-neutral-900 border border-neutral-700 rounded-xl p-3 text-sm text-white outline-none focus:border-purple-500 resize-y"
+          />
+          <p className="text-xs text-neutral-500 mt-2">Dessa är originalets stödord. När skämtet läggs i ett set skapas en separat kopia som kan anpassas utan att ändra originalet.</p>
+        </div>
 
         {/* PUNCHLINES/FÖLJDSKÄMT */}
         <div className="shrink-0 border-t border-neutral-800/60 pt-6">
