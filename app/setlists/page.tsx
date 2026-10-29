@@ -284,45 +284,49 @@ function SetlistsContent() {
     setIsSaving(false);
   };
 
-  // Create a genuinely independent setlist. Never copy past gig results or the
-  // performed_at lock; preserve the source setlist untouched.
-  const handleSaveAsNew = async () => {
-    const suggestedName = title.trim() ? `${title.trim()} – kopia` : "Ny setlista";
-    const newTitle = window.prompt("Namn på den nya setlistan:", suggestedName);
-    if (newTitle === null) return;
-    const cleanTitle = newTitle.trim();
-    if (!cleanTitle) {
-      setSaveError("Ange ett namn på den nya setlistan.");
-      return;
-    }
+  // Clone the SAVED database record, not the editable title/current form state.
+  // A successful clone must have a distinct database ID before it is opened.
+  const cloneSavedSetlist = async (source: any) => {
+    if (isSaving) return;
+    const sourceTitle = String(source.title || "Namnlös setlista");
+    const proposed = window.prompt("Namn på kopian:", `${sourceTitle} – kopia`);
+    if (proposed === null) return;
+    const cloneTitle = proposed.trim();
+    if (!cloneTitle) { setSaveError("Ange ett namn på kopian."); setMobileView("set"); return; }
     setIsSaving(true);
     setSaveError("");
-    const cleanBitIds = setlist.map(String);
-    const cuesToSave = snapshottedCues(cleanBitIds);
-    const { data, error } = await supabase.from("setlists").insert([{
-      title: cleanTitle,
-      venue,
-      bit_ids: [...cleanBitIds],
-      hidden_bit_ids: hiddenBits.map(String),
-      cue_overrides: { ...cuesToSave },
-      routine_snapshots: getRoutineSnapshotsForSave(cleanBitIds),
-      memory_cards: memoryCards.filter(card => cleanBitIds.includes(card.start_bit_id)).map(card => ({ ...card }))
-    }]).select().single();
-    if (error || !data) {
-      setSaveError(error?.message || "Kunde inte skapa en kopia.");
-    } else {
-      setActiveId(data.id);
-      setTitle(cleanTitle);
-      setPerformedAt(null);
-      setOverallGigScore(0);
-      setGigNotes("");
-      setBitScores({});
-      setCueOverrides(cuesToSave);
-      showSaved();
+    const sourceIds = Array.isArray(source.bit_ids) ? source.bit_ids.map(String) : [];
+    const copyPayload = {
+      title: cloneTitle,
+      venue: source.venue || "",
+      bit_ids: [...sourceIds],
+      hidden_bit_ids: Array.isArray(source.hidden_bit_ids) ? [...source.hidden_bit_ids] : [],
+      cue_overrides: structuredClone(source.cue_overrides || {}),
+      routine_snapshots: structuredClone(source.routine_snapshots || {}),
+      memory_cards: structuredClone(source.memory_cards || [])
+    };
+    try {
+      const { data, error } = await supabase.from("setlists").insert([copyPayload]).select("*").single();
+      if (error) throw error;
+      if (!data?.id || String(data.id) === String(source.id)) {
+        throw new Error("Databasen bekräftade inte att kopian fick ett eget ID.");
+      }
       await fetchData();
+      loadSetlist({ ...data, evaluations: {}, performed_at: null });
+      window.alert(`Kopian ”${cloneTitle}” har skapats. Originalet finns kvar.`);
+    } catch (err: any) {
+      setSaveError(err?.message || "Kunde inte klona setlistan.");
       setMobileView("set");
+    } finally {
+      setIsSaving(false);
     }
-    setIsSaving(false);
+  };
+
+  const handleCloneCurrent = async () => {
+    if (activeId == null) return;
+    const source = savedSetlists.find(s => String(s.id) === String(activeId));
+    if (!source) { setSaveError("Spara setlistan innan du klonar den."); return; }
+    await cloneSavedSetlist(source);
   };
 
   const handleSwipe = (bitId: string, direction: 'up' | 'down' | 'left' | 'right') => {
@@ -1039,7 +1043,10 @@ function SetlistsContent() {
                     {setlistObj.title || "Namnlös Setlist"}
                     {isPerformed && <span title={`Genomfört! Betyg: ${score}/5`} className="flex items-center gap-0.5 text-orange-500"><Flame size={12} className="fill-orange-500" /></span>}
                   </h3>
-                  <button onClick={(e) => deleteSetlist(e, setlistObj.id)} className="text-neutral-600 hover:text-red-400 md:opacity-0 md:group-hover:opacity-100 transition-opacity"><Trash2 size={15} /></button>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button type="button" disabled={isSaving} title="Klona setlistan" aria-label={`Klona ${setlistObj.title || 'setlista'}`} onClick={(e) => { e.stopPropagation(); void cloneSavedSetlist(setlistObj); }} className="flex items-center gap-1 text-xs text-indigo-300 hover:text-indigo-100 disabled:opacity-50"><Plus size={15} /> Klona</button>
+                    <button type="button" onClick={(e) => deleteSetlist(e, setlistObj.id)} className="text-neutral-500 hover:text-red-400" aria-label="Radera setlista"><Trash2 size={15} /></button>
+                  </div>
                 </div>
                 <p className="text-[10px] md:text-xs text-neutral-500 flex items-center gap-1"><MapPin size={10} /> {setlistObj.venue || "Ingen plats"}</p>
                 <div className="flex items-center gap-2 mt-2 md:mt-3">
@@ -1078,7 +1085,7 @@ function SetlistsContent() {
             {setlistBits.length > 0 && <button onClick={() => { setPrintMemoryCards(false); setIsPrintMode(true); }} className="flex items-center justify-center flex-1 lg:flex-none gap-2 px-3 py-2 md:px-3.5 md:py-2.5 rounded-lg font-bold transition-all bg-neutral-800 hover:bg-neutral-700 text-white border border-neutral-700 text-xs md:text-sm"><Printer size={16} /> <span className="hidden lg:inline">Fusklapp</span></button>}
             {orderedMemoryCards.length > 0 && <button onClick={() => { setPrintMemoryCards(true); setIsPrintMode(true); }} className="flex items-center justify-center flex-1 lg:flex-none gap-2 px-3 py-2 md:px-3.5 md:py-2.5 rounded-lg font-bold bg-neutral-800 hover:bg-neutral-700 text-white border border-purple-800 text-xs md:text-sm"><Printer size={16} /> Skriv ut A6-lappar</button>}
             {setlistBits.length > 0 && !performedAt && <button onClick={() => { setIsGigMode(true); setIsTimerRunning(false); }} className="flex items-center justify-center flex-1 lg:flex-none gap-2 px-4 py-2 md:px-5 md:py-2.5 rounded-lg font-bold bg-purple-600 hover:bg-purple-500 text-white shadow-lg text-xs md:text-sm"><Play size={16} className="fill-white" /> Starta Gig</button>}
-            {activeId !== null && <button onClick={handleSaveAsNew} disabled={isSaving} className="flex items-center justify-center flex-1 lg:flex-none gap-2 px-4 py-2 md:px-5 md:py-2.5 rounded-lg text-xs md:text-sm font-bold bg-indigo-900/60 hover:bg-indigo-800 text-white border border-indigo-700 disabled:opacity-50"><Plus size={16} /> Spara som ny</button>}
+            {activeId !== null && <button onClick={handleCloneCurrent} disabled={isSaving} className="flex items-center justify-center flex-1 lg:flex-none gap-2 px-4 py-2 md:px-5 md:py-2.5 rounded-lg text-xs md:text-sm font-bold bg-indigo-900/60 hover:bg-indigo-800 text-white border border-indigo-700 disabled:opacity-50"><Plus size={16} /> Klona</button>}
             {!performedAt && <button onClick={() => handleSave()} disabled={isSaving || !title} className={`flex items-center justify-center flex-1 lg:flex-none gap-2 px-4 py-2 md:px-5 md:py-2.5 rounded-lg text-xs md:text-sm font-bold bg-neutral-800 hover:bg-neutral-700 text-white border border-neutral-700 ${(isSaving || !title) ? "opacity-50 cursor-not-allowed" : ""}`}>{saved ? <Check size={16} /> : <Save size={16} />} Spara</button>}
           </div>
         </div>

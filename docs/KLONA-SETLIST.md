@@ -1,18 +1,18 @@
-# Klona setlist (2026-10-29)
+# Klona setlistor – reviderad version
 
-## Nytt
-- **Spara** uppdaterar fortfarande aktuell setlist (inklusive namn).
-- **Spara som ny** skapar en ny databaspost med ett nytt ID, och byter till den nya kopian i redigeraren.
-- Kopian innehåller aktuell ordning, plats, dolda skämt, stödord och minneslappar.
-- Utförandedatum, betyg och utvärdering kopieras **inte**, så kopian går att redigera och använda vid nytt gig.
-- Ursprunglig setlist lämnas orörd. Även genomförda set kan klonas.
-- Funktionen kräver ingen ny SQL-migrering.
+- Tryck **Klona** direkt på valfri sparad setlista, eller på **Klona** i redigeraren för den aktuella sparade setlistan.
+- Ange namn på kopian. Appen gör `INSERT` från den **sparade källposten**, inte `UPDATE`.
+- Kopian har ett eget databas-ID. Originalet behåller sitt namn och innehåll.
+- Kopierar ordning, dolda skämt, stödord, rutinögonblicksbilder och minneslappar.
+- Kopierar inte genomförandedatum och gigutvärdering.
+- Vid lyckad kloning öppnas kopian. Om databasen nekar `INSERT` visas ett felmeddelande, och ingen framgång påstås.
 
 ## Test
-1. Öppna en sparad setlist. Klicka **Spara som ny** och ge kopian ett annat namn.
-2. Öppna **Sparade** och kontrollera att både originalet och kopian syns.
-3. Ändra ordningen i kopian och klicka **Spara**. Kontrollera att originalet är oförändrat.
-4. Prova en setlist med stödord och minneslappar.
 
-## Begränsning
-Denna version innehåller bara kloningsfixen. Stöd för Writer-rutiner som hela block ingår inte ännu; det kräver separat datamodell och test av manus-/övergångsinnehåll.
+1. Spara ett testset som `A`.
+2. Tryck **Klona** på posten `A` i **Sparade** och döp kopian till `B`.
+3. Verifiera att både `A` och `B` finns i listan.
+4. Ändra `B`, tryck **Spara**, och kontrollera att `A` fortfarande är oförändrad.
+5. Prova även att klona en genomförd setlista.
+
+**Observera:** Har du osparade ändringar i redigeraren måste du först spara dem om de ska ingå i kopian. Kloning använder det senast sparade setet.
