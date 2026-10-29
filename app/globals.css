@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* A6 memory cards: four cards in a portrait A4 sheet, 1:1 physical size. */
+.memory-print-pages { background: #e5e5e5; padding: 15px 0; }
+.memory-print-page { display: grid; grid-template-columns: repeat(2, 105mm); grid-template-rows: repeat(2, 148.5mm); width: 210mm; height: 297mm; margin: 0 auto 14px; background: white; box-shadow: 0 4px 20px #0002; }
+.memory-print-card { box-sizing: border-box; width: 105mm; height: 148.5mm; overflow: hidden; padding: 11mm 9mm; border: 0.2mm dashed #aaa; color: #111; font-family: Arial, Helvetica, sans-serif; }
+.memory-print-card-heading { border-bottom: 1.5px solid #222; padding-bottom: 5mm; margin-bottom: 8mm; }
+.memory-print-card-number { font-size: 9pt; font-weight: 800; letter-spacing: .12em; }
+.memory-print-card-heading h2 { font-size: 22pt; line-height: 1.1; font-weight: 800; margin-top: 2mm; overflow-wrap: anywhere; }
+.memory-print-card-count { font-size: 9pt; color: #555; }
+.memory-print-jokes { list-style: decimal; padding-left: 7mm; font-size: 15pt; font-weight: 700; line-height: 1.32; }
+.memory-print-jokes li { padding: 0 0 5mm 1mm; overflow-wrap: anywhere; }
+@media print {
+  @page { size: A4 portrait; margin: 0; }
+  html, body { margin: 0 !important; padding: 0 !important; }
+  .memory-print-screen { position: absolute !important; inset: 0 !important; overflow: visible !important; }
+  .memory-print-pages { padding: 0 !important; background: white !important; }
+  .memory-print-page { margin: 0 !important; box-shadow: none !important; break-after: page; page-break-after: always; }
+  .memory-print-page:last-child { break-after: auto; page-break-after: auto; }
+  .memory-print-controls { display: none !important; }
+}
