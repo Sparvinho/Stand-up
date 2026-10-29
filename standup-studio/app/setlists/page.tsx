@@ -35,6 +35,10 @@ function SetlistsContent() {
   const addId = searchParams.get("add");
   const [savedSetlists, setSavedSetlists] = useState<any[]>([]);
   const [allBits, setAllBits] = useState<any[]>([]);
+  const [routines, setRoutines] = useState<any[]>([]);
+  const [routineSnapshots, setRoutineSnapshots] = useState<Record<string, any>>({});
+  const [libraryTab, setLibraryTab] = useState<'bits' | 'routines'>('bits');
+  const [routineLoadError, setRoutineLoadError] = useState('');
   const [activeId, setActiveId] = useState<any>(null);
   const [title, setTitle] = useState("");
   const [venue, setVenue] = useState("");
@@ -148,6 +152,9 @@ function SetlistsContent() {
       }));
       setAllBits(safeBits);
     }
+    const { data: routinesData, error: routinesError } = await supabase.from("routines").select("id,title,status,items").order("created_at", { ascending: false });
+    if (routinesError) setRoutineLoadError(routinesError.message);
+    else { setRoutineLoadError(''); setRoutines(routinesData || []); }
     const { data: setlistsData } = await supabase.from("setlists").select("*").order("created_at", { ascending: false });
     if (setlistsData) {
       const safeData = setlistsData.map(r => ({
@@ -155,6 +162,7 @@ function SetlistsContent() {
         bit_ids: Array.isArray(r.bit_ids) ? r.bit_ids.map(String) : [],
         hidden_bit_ids: Array.isArray(r.hidden_bit_ids) ? r.hidden_bit_ids.map(String) : [],
         cue_overrides: r.cue_overrides && typeof r.cue_overrides === "object" && !Array.isArray(r.cue_overrides) ? r.cue_overrides : {},
+        routine_snapshots: r.routine_snapshots && typeof r.routine_snapshots === "object" && !Array.isArray(r.routine_snapshots) ? r.routine_snapshots : {},
         memory_cards: Array.isArray(r.memory_cards) ? r.memory_cards.filter((card: any) => card && typeof card.start_bit_id === 'string' && typeof card.title === 'string') : [],
         evaluations: r.evaluations || {}
       }));
@@ -181,6 +189,7 @@ function SetlistsContent() {
     setSetlist(Array.isArray(setlistObj.bit_ids) ? setlistObj.bit_ids.map(String) : []);
     setCueOverrides(setlistObj.cue_overrides && typeof setlistObj.cue_overrides === "object" ? setlistObj.cue_overrides : {});
     setMemoryCards(Array.isArray(setlistObj.memory_cards) ? setlistObj.memory_cards : []);
+    setRoutineSnapshots(setlistObj.routine_snapshots || {});
     setSaveError("");
     setHiddenBits(Array.isArray(setlistObj.hidden_bit_ids) ? setlistObj.hidden_bit_ids.map(String) : []);
     if (setlistObj.evaluations) {
@@ -204,6 +213,7 @@ function SetlistsContent() {
     setSetlist([]);
     setCueOverrides({});
     setMemoryCards([]);
+    setRoutineSnapshots({});
     setSaveError("");
     setHiddenBits([]);
     setOverallGigScore(0);
@@ -222,6 +232,35 @@ function SetlistsContent() {
     Object.prototype.hasOwnProperty.call(cueOverrides, String(bit.id))
       ? cueOverrides[String(bit.id)] : (bit.stage_cues || "");
 
+  // Store a complete, immutable routine snapshot inside this particular set.
+  // IDs have a type prefix, so they cannot collide with regular bit UUIDs.
+  const routineKey = (id: string) => `routine:${id}`;
+  const routineToStageBlock = (routine: any) => {
+    const items = Array.isArray(routine.items) ? routine.items : [];
+    const text = items.map((item: any) => item?.type === 'bit'
+      ? [item.title, item.premise].filter(Boolean).join('\n')
+      : item?.type === 'segue' ? (item.text || '') : '').filter(Boolean).join('\n\n');
+    const seconds = items.reduce((sum: number, item: any) => sum + (item?.type === 'bit'
+      ? Math.max(0, Number(item.duration_seconds) || Math.round((String(item.premise || '').split(/\s+/).filter(Boolean).length / 130) * 60))
+      : 0), 0);
+    return { id: routineKey(String(routine.id)), title: routine.title || 'Namnlös rutin',
+      premise: text, routine_items: items, is_routine: true, duration_seconds: seconds,
+      status: routine.status || 'Råidé', stage_cues: '', priority: 1 };
+  };
+  const getRoutineSnapshotsForSave = (ids: string[]) => Object.fromEntries(
+    ids.filter(id => id.startsWith('routine:')).map(id => [id, routineSnapshots[id]
+      || (routines.find(r => routineKey(String(r.id)) === id) ? routineToStageBlock(routines.find(r => routineKey(String(r.id)) === id)) : null)])
+      .filter((entry): entry is [string, any] => entry[1] !== null)
+  );
+  const addRoutine = (routine: any) => {
+    if (performedAt) return;
+    const block = routineToStageBlock(routine);
+    if (setlist.includes(block.id)) return;
+    setRoutineSnapshots(prev => ({ ...prev, [block.id]: block }));
+    setSetlist(prev => [...prev, block.id]);
+    setCueOverrides(prev => ({ ...prev, [block.id]: '' }));
+    setMobileView('set');
+  };
   const handleSave = async (markAsPerformed = false) => {
     setIsSaving(true);
     setSaveError("");
@@ -231,18 +270,63 @@ function SetlistsContent() {
     const cardsToSave = memoryCards.filter(card => cleanBitIds.includes(card.start_bit_id));
     if (activeId !== null && activeId !== undefined) {
       const { error } = await supabase.from("setlists").update({
-        title, venue, bit_ids: cleanBitIds, hidden_bit_ids: cleanHiddenIds, cue_overrides: cuesToSave, memory_cards: cardsToSave
+        title, venue, bit_ids: cleanBitIds, hidden_bit_ids: cleanHiddenIds, cue_overrides: cuesToSave, routine_snapshots: getRoutineSnapshotsForSave(cleanBitIds), memory_cards: cardsToSave
       }).eq("id", activeId);
       if (!error) { setCueOverrides(cuesToSave); showSaved(); await fetchData(); }
       else setSaveError(error.message);
     } else {
       const { data, error } = await supabase.from("setlists").insert([{
-        title, venue, bit_ids: cleanBitIds, hidden_bit_ids: cleanHiddenIds, cue_overrides: cuesToSave, memory_cards: cardsToSave
+        title, venue, bit_ids: cleanBitIds, hidden_bit_ids: cleanHiddenIds, cue_overrides: cuesToSave, routine_snapshots: getRoutineSnapshotsForSave(cleanBitIds), memory_cards: cardsToSave
       }]).select().single();
       if (data && !error) { setCueOverrides(cuesToSave); setActiveId(data.id); showSaved(); await fetchData(); }
       else if (error) setSaveError(error.message);
     }
     setIsSaving(false);
+  };
+
+  // Clone the SAVED database record, not the editable title/current form state.
+  // A successful clone must have a distinct database ID before it is opened.
+  const cloneSavedSetlist = async (source: any) => {
+    if (isSaving) return;
+    const sourceTitle = String(source.title || "Namnlös setlista");
+    const proposed = window.prompt("Namn på kopian:", `${sourceTitle} – kopia`);
+    if (proposed === null) return;
+    const cloneTitle = proposed.trim();
+    if (!cloneTitle) { setSaveError("Ange ett namn på kopian."); setMobileView("set"); return; }
+    setIsSaving(true);
+    setSaveError("");
+    const sourceIds = Array.isArray(source.bit_ids) ? source.bit_ids.map(String) : [];
+    const copyPayload = {
+      title: cloneTitle,
+      venue: source.venue || "",
+      bit_ids: [...sourceIds],
+      hidden_bit_ids: Array.isArray(source.hidden_bit_ids) ? [...source.hidden_bit_ids] : [],
+      cue_overrides: structuredClone(source.cue_overrides || {}),
+      routine_snapshots: structuredClone(source.routine_snapshots || {}),
+      memory_cards: structuredClone(source.memory_cards || [])
+    };
+    try {
+      const { data, error } = await supabase.from("setlists").insert([copyPayload]).select("*").single();
+      if (error) throw error;
+      if (!data?.id || String(data.id) === String(source.id)) {
+        throw new Error("Databasen bekräftade inte att kopian fick ett eget ID.");
+      }
+      await fetchData();
+      loadSetlist({ ...data, evaluations: {}, performed_at: null });
+      window.alert(`Kopian ”${cloneTitle}” har skapats. Originalet finns kvar.`);
+    } catch (err: any) {
+      setSaveError(err?.message || "Kunde inte klona setlistan.");
+      setMobileView("set");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleCloneCurrent = async () => {
+    if (activeId == null) return;
+    const source = savedSetlists.find(s => String(s.id) === String(activeId));
+    if (!source) { setSaveError("Spara setlistan innan du klonar den."); return; }
+    await cloneSavedSetlist(source);
   };
 
   const handleSwipe = (bitId: string, direction: 'up' | 'down' | 'left' | 'right') => {
@@ -281,17 +365,17 @@ function SetlistsContent() {
     
     if (activeId) {
       await supabase.from("setlists").update({
-        performed_at: currentPerformedAt, evaluations: evaluationData, cue_overrides: snapshottedCues(cleanBitIds), memory_cards: memoryCards.filter(card => cleanBitIds.includes(card.start_bit_id))
+        performed_at: currentPerformedAt, evaluations: evaluationData, cue_overrides: snapshottedCues(cleanBitIds), routine_snapshots: getRoutineSnapshotsForSave(cleanBitIds), memory_cards: memoryCards.filter(card => cleanBitIds.includes(card.start_bit_id))
       }).eq("id", activeId);
     } else {
       const { data } = await supabase.from("setlists").insert([{
         title, venue, bit_ids: cleanBitIds, hidden_bit_ids: hiddenBits.map(String),
-        performed_at: currentPerformedAt, evaluations: evaluationData, cue_overrides: snapshottedCues(cleanBitIds), memory_cards: memoryCards.filter(card => cleanBitIds.includes(card.start_bit_id))
+        performed_at: currentPerformedAt, evaluations: evaluationData, cue_overrides: snapshottedCues(cleanBitIds), routine_snapshots: getRoutineSnapshotsForSave(cleanBitIds), memory_cards: memoryCards.filter(card => cleanBitIds.includes(card.start_bit_id))
       }]).select().single();
       if (data) setActiveId(data.id);
     }
 
-    const bitIdsToUpdate = Object.keys(bitScores).filter(id => bitScores[id] > 0);
+    const bitIdsToUpdate = Object.keys(bitScores).filter(id => bitScores[id] > 0 && !id.startsWith("routine:"));
     if (bitIdsToUpdate.length > 0) {
       const { data: bitsToUpdate } = await supabase.from("bits").select("id, gig_stats").in("id", bitIdsToUpdate);
       for (const bit of bitsToUpdate || []) {
@@ -353,6 +437,7 @@ function SetlistsContent() {
     setSetlist(setlist.filter(id => id !== idStr));
     setCueOverrides(prev => { const next = { ...prev }; delete next[idStr]; return next; });
     setMemoryCards(prev => prev.filter(card => card.start_bit_id !== idStr));
+    setRoutineSnapshots(prev => { const next = { ...prev }; delete next[idStr]; return next; });
     setCopilotSuggestions([]);
   };
 
@@ -412,7 +497,10 @@ function SetlistsContent() {
     return (((guld || 0) * 5) + ((bra || 0) * 4) + ((bomb || 0) * 1)) / total;
   };
 
-  const setlistBits = setlist.map(id => allBits.find(b => String(b.id) === String(id))).filter(Boolean);
+  const setlistBits = setlist.map(id => id.startsWith('routine:')
+    ? routineSnapshots[id] || (routines.find(r => routineKey(String(r.id)) === id)
+      ? routineToStageBlock(routines.find(r => routineKey(String(r.id)) === id)) : null)
+    : allBits.find(b => String(b.id) === String(id))).filter(Boolean);
   
   // Cards start at a particular bit; moving the bit moves the boundary with it.
   // First card is implicit when at least one explicit boundary exists.
@@ -431,7 +519,26 @@ function SetlistsContent() {
       current.bits.push(bit);
     }
     return result;
-  }, [memoryCards, setlist, allBits]);
+  }, [memoryCards, setlist, allBits, routineSnapshots, routines]);
+
+  // Move an entire memory card without changing the order of jokes within it.
+  // Rebuild boundaries explicitly so even a formerly implicit first card keeps its title.
+  const moveMemoryCard = (startId: string, direction: 'up' | 'down') => {
+    if (performedAt || orderedMemoryCards.length < 2) return;
+    const index = orderedMemoryCards.findIndex(card => card.start_bit_id === startId);
+    const target = index + (direction === 'up' ? -1 : 1);
+    if (index < 0 || target < 0 || target >= orderedMemoryCards.length) return;
+    const groups = orderedMemoryCards.map(card => ({
+      title: card.title,
+      ids: card.bits.map(bit => String(bit.id)),
+    }));
+    [groups[index], groups[target]] = [groups[target], groups[index]];
+    setSetlist(groups.flatMap(group => group.ids));
+    setMemoryCards(groups.filter(group => group.ids.length > 0).map(group => ({
+      start_bit_id: group.ids[0], title: group.title,
+    })));
+    setCopilotSuggestions([]);
+  };
 
   // Mix two recall tasks: remember the jokes on a random card, or name the next card.
   // The last card cannot be the subject of a "what comes next?" question.
@@ -813,7 +920,7 @@ function SetlistsContent() {
               {memoryCards.find(card => card.start_bit_id === String(bit.id)) && <div className="mt-2 mb-1 border-t border-purple-900/60 pt-1 text-xs uppercase tracking-widest text-purple-300 font-semibold">{memoryCards.find(card => card.start_bit_id === String(bit.id))?.title}</div>}
               <div className={`border-l-2 border-neutral-700 ${stageDensity === 'compact' ? 'pl-3 py-1' : 'pl-4 py-2'}`}>
                 <div className="flex items-baseline gap-3 justify-between">
-                  <h2 className={`${stageDensity === 'compact' ? 'text-lg sm:text-xl' : 'text-2xl sm:text-3xl'} font-extrabold tracking-tight leading-tight`}><span className="text-purple-400 mr-2">{index + 1}.</span>{bit.title}</h2>
+                  <h2 className={`${stageDensity === 'compact' ? 'text-lg sm:text-xl' : 'text-2xl sm:text-3xl'} font-extrabold tracking-tight leading-tight`}><span className="text-purple-400 mr-2">{index + 1}.</span>{bit.title}{bit.is_routine && <span className="text-[9px] font-bold text-orange-300 border border-orange-800 rounded px-1">RUTIN</span>}</h2>
                   <span className="shrink-0 text-xs text-neutral-500">{Math.round((bit.duration_seconds || 0) / 60 * 10) / 10} min</span>
                 </div>
                 {getSetCues(bit) && <p className={`${stageDensity === 'compact' ? 'text-sm' : 'text-base sm:text-lg'} text-neutral-300 mt-1 whitespace-pre-wrap leading-snug`}>{getSetCues(bit)}</p>}
@@ -955,7 +1062,10 @@ function SetlistsContent() {
                     {setlistObj.title || "Namnlös Setlist"}
                     {isPerformed && <span title={`Genomfört! Betyg: ${score}/5`} className="flex items-center gap-0.5 text-orange-500"><Flame size={12} className="fill-orange-500" /></span>}
                   </h3>
-                  <button onClick={(e) => deleteSetlist(e, setlistObj.id)} className="text-neutral-600 hover:text-red-400 md:opacity-0 md:group-hover:opacity-100 transition-opacity"><Trash2 size={15} /></button>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button type="button" disabled={isSaving} title="Klona setlistan" aria-label={`Klona ${setlistObj.title || 'setlista'}`} onClick={(e) => { e.stopPropagation(); void cloneSavedSetlist(setlistObj); }} className="flex items-center gap-1 text-xs text-indigo-300 hover:text-indigo-100 disabled:opacity-50"><Plus size={15} /> Klona</button>
+                    <button type="button" onClick={(e) => deleteSetlist(e, setlistObj.id)} className="text-neutral-500 hover:text-red-400" aria-label="Radera setlista"><Trash2 size={15} /></button>
+                  </div>
                 </div>
                 <p className="text-[10px] md:text-xs text-neutral-500 flex items-center gap-1"><MapPin size={10} /> {setlistObj.venue || "Ingen plats"}</p>
                 <div className="flex items-center gap-2 mt-2 md:mt-3">
@@ -994,6 +1104,7 @@ function SetlistsContent() {
             {setlistBits.length > 0 && <button onClick={() => { setPrintMemoryCards(false); setIsPrintMode(true); }} className="flex items-center justify-center flex-1 lg:flex-none gap-2 px-3 py-2 md:px-3.5 md:py-2.5 rounded-lg font-bold transition-all bg-neutral-800 hover:bg-neutral-700 text-white border border-neutral-700 text-xs md:text-sm"><Printer size={16} /> <span className="hidden lg:inline">Fusklapp</span></button>}
             {orderedMemoryCards.length > 0 && <button onClick={() => { setPrintMemoryCards(true); setIsPrintMode(true); }} className="flex items-center justify-center flex-1 lg:flex-none gap-2 px-3 py-2 md:px-3.5 md:py-2.5 rounded-lg font-bold bg-neutral-800 hover:bg-neutral-700 text-white border border-purple-800 text-xs md:text-sm"><Printer size={16} /> Skriv ut A6-lappar</button>}
             {setlistBits.length > 0 && !performedAt && <button onClick={() => { setIsGigMode(true); setIsTimerRunning(false); }} className="flex items-center justify-center flex-1 lg:flex-none gap-2 px-4 py-2 md:px-5 md:py-2.5 rounded-lg font-bold bg-purple-600 hover:bg-purple-500 text-white shadow-lg text-xs md:text-sm"><Play size={16} className="fill-white" /> Starta Gig</button>}
+            {activeId !== null && <button onClick={handleCloneCurrent} disabled={isSaving} className="flex items-center justify-center flex-1 lg:flex-none gap-2 px-4 py-2 md:px-5 md:py-2.5 rounded-lg text-xs md:text-sm font-bold bg-indigo-900/60 hover:bg-indigo-800 text-white border border-indigo-700 disabled:opacity-50"><Plus size={16} /> Klona</button>}
             {!performedAt && <button onClick={() => handleSave()} disabled={isSaving || !title} className={`flex items-center justify-center flex-1 lg:flex-none gap-2 px-4 py-2 md:px-5 md:py-2.5 rounded-lg text-xs md:text-sm font-bold bg-neutral-800 hover:bg-neutral-700 text-white border border-neutral-700 ${(isSaving || !title) ? "opacity-50 cursor-not-allowed" : ""}`}>{saved ? <Check size={16} /> : <Save size={16} />} Spara</button>}
           </div>
         </div>
@@ -1046,7 +1157,11 @@ function SetlistsContent() {
                 {/* UPPDATERAT SÖK-BLOCK MED BÅDE VANLIG SÖK OCH AI-SÖK */}
                 <div className="flex flex-col gap-2 w-full">
                   <div className="flex gap-2 w-full">
-                    <div className="relative flex-1">
+                    <div className="flex gap-1 bg-neutral-950 rounded-lg border border-neutral-800 p-1 shrink-0">
+                    <button type="button" onClick={() => setLibraryTab('bits')} className={`px-2 py-1 rounded text-xs ${libraryTab === 'bits' ? 'bg-purple-700 text-white' : 'text-neutral-400'}`}>Skämt</button>
+                    <button type="button" onClick={() => setLibraryTab('routines')} className={`px-2 py-1 rounded text-xs ${libraryTab === 'routines' ? 'bg-purple-700 text-white' : 'text-neutral-400'}`}>Rutiner</button>
+                  </div>
+                  <div className="relative flex-1">
                       <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
                       <input type="text" placeholder="Sök text..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-neutral-950 border border-neutral-800 rounded-lg pl-9 pr-3 py-1.5 text-xs text-white outline-none focus:border-purple-500/50" />
                       {searchQuery && <button onClick={() => setSearchQuery("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-white"><X size={12} /></button>}
@@ -1057,7 +1172,7 @@ function SetlistsContent() {
                     </button>
                   </div>
 
-                  <button
+                  {libraryTab === 'bits' && <button
                     type="button"
                     onClick={() => setFocusOnly(value => !value)}
                     aria-pressed={focusOnly}
@@ -1065,9 +1180,9 @@ function SetlistsContent() {
                     title="Visa bara skämt markerade Fokus i Comedy Writer"
                   >
                     <Flame size={14} fill={focusOnly ? 'currentColor' : 'none'} /> Bara Fokus
-                  </button>
+                  </button>}
 
-                  <div className="relative w-full">
+                  {libraryTab === 'bits' && <div className="relative w-full">
                     <Sparkles size={14} className={`absolute left-3 top-1/2 -translate-y-1/2 ${aiSuggestedIds !== null ? 'text-pink-400 animate-pulse' : 'text-pink-600/50'}`} />
                     <input 
                       type="text" 
@@ -1091,11 +1206,11 @@ function SetlistsContent() {
                     >
                       {isAiSearching ? <Loader2 size={12} className="animate-spin" /> : "Hitta"}
                     </button>
-                  </div>
+                  </div>}
                 </div>
 
                 {/* INFÄLLBARA FILTER */}
-                {showAdvancedFilters && (
+                {libraryTab === 'bits' && showAdvancedFilters && (
                   <div className="bg-neutral-950/80 border border-neutral-800 rounded-lg p-3 space-y-3 text-xs animate-in fade-in">
                     <div className="flex justify-between items-center border-b border-neutral-800/60 pb-2">
                       <span className="font-bold text-neutral-400">Filtrera skämt</span>
@@ -1188,7 +1303,21 @@ function SetlistsContent() {
               </div>
               
               <div className="flex-1 overflow-y-auto p-2 md:p-4 space-y-2">
-                {filteredAvailableBits.map(bit => {
+                {libraryTab === 'routines' && <>
+                  {routineLoadError && <p className="text-red-400 text-xs">Rutiner kunde inte hämtas: {routineLoadError}</p>}
+                  {routines.filter(r => !setlist.includes(routineKey(String(r.id))) &&
+                    `${r.title || ''} ${r.status || ''}`.toLowerCase().includes(searchQuery.toLowerCase())).map(r => (
+                    <div key={r.id} className="border border-orange-900/50 bg-neutral-950 p-3 rounded-lg">
+                      <div className="flex items-center justify-between gap-3">
+                        <div><h4 className="text-sm font-semibold text-orange-200">{r.title || 'Namnlös rutin'}</h4>
+                          <p className="text-xs text-neutral-500">{(r.items || []).filter((item: any) => item.type === 'bit').length} skämt · {r.status || 'Råidé'}</p>
+                        </div>
+                        <button type="button" title="Lägg till hela rutinen" onClick={() => addRoutine(r)} className="p-2 rounded bg-orange-900/30 hover:bg-orange-800/50 text-orange-200"><Plus size={16}/></button>
+                      </div>
+                    </div>
+                  ))}
+                </>}
+                {libraryTab === 'bits' && filteredAvailableBits.map(bit => {
                   const powerScore = calculatePowerScore(bit.gig_stats);
                   const hasSwipes = bit.gig_stats && bit.gig_stats.current && (bit.gig_stats.current.guld > 0 || bit.gig_stats.current.bra > 0 || bit.gig_stats.current.bomb > 0);
                   
@@ -1241,11 +1370,17 @@ function SetlistsContent() {
                 
                 return (
                   <div key={bit.id} className="space-y-1">
-                    {(memoryCards.some(card => card.start_bit_id === String(bit.id))) && (
+                    {(orderedMemoryCards.some(card => card.start_bit_id === String(bit.id))) && (
                       <div className="rounded-lg border border-purple-800/50 bg-purple-950/30 p-2 flex items-center gap-2">
                         <span className="text-purple-300 text-xs font-bold shrink-0">Minneslapp</span>
-                        <input aria-label="Minneslappens tema" disabled={!!performedAt} className="min-w-0 flex-1 bg-neutral-950 border border-neutral-700 rounded px-2 py-1 text-xs text-white" value={memoryCards.find(card => card.start_bit_id === String(bit.id))?.title || ''} onChange={e => setMemoryCards(prev => prev.map(card => card.start_bit_id === String(bit.id) ? {...card, title: e.target.value} : card))} />
-                        {!performedAt && <button title="Ta bort lappgräns" onClick={() => toggleMemoryBoundary(String(bit.id))}><X size={14}/></button>}
+                        <input aria-label="Minneslappens tema" disabled={!!performedAt} className="min-w-0 flex-1 bg-neutral-950 border border-neutral-700 rounded px-2 py-1 text-xs text-white" value={orderedMemoryCards.find(card => card.start_bit_id === String(bit.id))?.title || ''} onChange={e => setMemoryCards(prev => prev.some(card => card.start_bit_id === String(bit.id)) ? prev.map(card => card.start_bit_id === String(bit.id) ? {...card, title: e.target.value} : card) : [...prev, {start_bit_id: String(bit.id), title: e.target.value}])} />
+                        {!performedAt && orderedMemoryCards.length > 1 && (
+                          <div className="flex items-center gap-1 shrink-0" aria-label="Flytta hela minneslappen">
+                            <button type="button" title="Flytta hela lappen upp" aria-label="Flytta hela lappen upp" onClick={() => moveMemoryCard(String(bit.id), 'up')} disabled={orderedMemoryCards[0]?.start_bit_id === String(bit.id)} className="p-1 text-purple-300 hover:text-white disabled:opacity-25"><ChevronUp size={16}/></button>
+                            <button type="button" title="Flytta hela lappen ned" aria-label="Flytta hela lappen ned" onClick={() => moveMemoryCard(String(bit.id), 'down')} disabled={orderedMemoryCards[orderedMemoryCards.length - 1]?.start_bit_id === String(bit.id)} className="p-1 text-purple-300 hover:text-white disabled:opacity-25"><ChevronDown size={16}/></button>
+                          </div>
+                        )}
+                        {!performedAt && memoryCards.some(card => card.start_bit_id === String(bit.id)) && <button title="Ta bort lappgräns" onClick={() => toggleMemoryBoundary(String(bit.id))}><X size={14}/></button>}
                       </div>
                     )}
                     {!performedAt && !memoryCards.some(card => card.start_bit_id === String(bit.id)) && <button onClick={() => toggleMemoryBoundary(String(bit.id))} className="text-[10px] text-purple-400/70 hover:text-purple-200 px-2">+ Ny minneslapp här</button>}

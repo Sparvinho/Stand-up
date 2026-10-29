@@ -521,6 +521,25 @@ function SetlistsContent() {
     return result;
   }, [memoryCards, setlist, allBits, routineSnapshots, routines]);
 
+  // Move an entire memory card without changing the order of jokes within it.
+  // Rebuild boundaries explicitly so even a formerly implicit first card keeps its title.
+  const moveMemoryCard = (startId: string, direction: 'up' | 'down') => {
+    if (performedAt || orderedMemoryCards.length < 2) return;
+    const index = orderedMemoryCards.findIndex(card => card.start_bit_id === startId);
+    const target = index + (direction === 'up' ? -1 : 1);
+    if (index < 0 || target < 0 || target >= orderedMemoryCards.length) return;
+    const groups = orderedMemoryCards.map(card => ({
+      title: card.title,
+      ids: card.bits.map(bit => String(bit.id)),
+    }));
+    [groups[index], groups[target]] = [groups[target], groups[index]];
+    setSetlist(groups.flatMap(group => group.ids));
+    setMemoryCards(groups.filter(group => group.ids.length > 0).map(group => ({
+      start_bit_id: group.ids[0], title: group.title,
+    })));
+    setCopilotSuggestions([]);
+  };
+
   // Mix two recall tasks: remember the jokes on a random card, or name the next card.
   // The last card cannot be the subject of a "what comes next?" question.
   const nextMemoryQuestion = (previous: MemoryQuestion | null = null) => {
@@ -1351,11 +1370,17 @@ function SetlistsContent() {
                 
                 return (
                   <div key={bit.id} className="space-y-1">
-                    {(memoryCards.some(card => card.start_bit_id === String(bit.id))) && (
+                    {(orderedMemoryCards.some(card => card.start_bit_id === String(bit.id))) && (
                       <div className="rounded-lg border border-purple-800/50 bg-purple-950/30 p-2 flex items-center gap-2">
                         <span className="text-purple-300 text-xs font-bold shrink-0">Minneslapp</span>
-                        <input aria-label="Minneslappens tema" disabled={!!performedAt} className="min-w-0 flex-1 bg-neutral-950 border border-neutral-700 rounded px-2 py-1 text-xs text-white" value={memoryCards.find(card => card.start_bit_id === String(bit.id))?.title || ''} onChange={e => setMemoryCards(prev => prev.map(card => card.start_bit_id === String(bit.id) ? {...card, title: e.target.value} : card))} />
-                        {!performedAt && <button title="Ta bort lappgräns" onClick={() => toggleMemoryBoundary(String(bit.id))}><X size={14}/></button>}
+                        <input aria-label="Minneslappens tema" disabled={!!performedAt} className="min-w-0 flex-1 bg-neutral-950 border border-neutral-700 rounded px-2 py-1 text-xs text-white" value={orderedMemoryCards.find(card => card.start_bit_id === String(bit.id))?.title || ''} onChange={e => setMemoryCards(prev => prev.some(card => card.start_bit_id === String(bit.id)) ? prev.map(card => card.start_bit_id === String(bit.id) ? {...card, title: e.target.value} : card) : [...prev, {start_bit_id: String(bit.id), title: e.target.value}])} />
+                        {!performedAt && orderedMemoryCards.length > 1 && (
+                          <div className="flex items-center gap-1 shrink-0" aria-label="Flytta hela minneslappen">
+                            <button type="button" title="Flytta hela lappen upp" aria-label="Flytta hela lappen upp" onClick={() => moveMemoryCard(String(bit.id), 'up')} disabled={orderedMemoryCards[0]?.start_bit_id === String(bit.id)} className="p-1 text-purple-300 hover:text-white disabled:opacity-25"><ChevronUp size={16}/></button>
+                            <button type="button" title="Flytta hela lappen ned" aria-label="Flytta hela lappen ned" onClick={() => moveMemoryCard(String(bit.id), 'down')} disabled={orderedMemoryCards[orderedMemoryCards.length - 1]?.start_bit_id === String(bit.id)} className="p-1 text-purple-300 hover:text-white disabled:opacity-25"><ChevronDown size={16}/></button>
+                          </div>
+                        )}
+                        {!performedAt && memoryCards.some(card => card.start_bit_id === String(bit.id)) && <button title="Ta bort lappgräns" onClick={() => toggleMemoryBoundary(String(bit.id))}><X size={14}/></button>}
                       </div>
                     )}
                     {!performedAt && !memoryCards.some(card => card.start_bit_id === String(bit.id)) && <button onClick={() => toggleMemoryBoundary(String(bit.id))} className="text-[10px] text-purple-400/70 hover:text-purple-200 px-2">+ Ny minneslapp här</button>}
